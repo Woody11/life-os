@@ -81,40 +81,41 @@ router.patch('/:id/stage', (req, res) => {
   }
 
   try {
-    db.prepare(
-      "UPDATE kanban_cards SET stage = ?, updated_at = datetime('now'), agent_pending = 0 WHERE id = ?",
-    ).run(stage, card.id);
-
     const agentName = pipeline.agents[stage] ?? null;
     let dispatchId = null;
+    let updated;
 
-    if (agentName) {
-      const prompt = buildAgentPrompt(card, stage, agentName);
-      const dispInfo = db
-        .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
-        .run(agentName, prompt, 'pending');
-      dispatchId = dispInfo.lastInsertRowid;
+    db.transaction(() => {
+      db.prepare(
+        "UPDATE kanban_cards SET stage = ?, updated_at = datetime('now'), agent_pending = 0 WHERE id = ?",
+      ).run(stage, card.id);
 
-      db.prepare('INSERT INTO kanban_stage_dispatches (card_id, stage, dispatch_id) VALUES (?, ?, ?)').run(
-        card.id, stage, dispatchId,
-      );
+      if (agentName) {
+        const prompt = buildAgentPrompt(card, stage, agentName);
+        const dispInfo = db
+          .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
+          .run(agentName, prompt, 'pending');
+        dispatchId = dispInfo.lastInsertRowid;
 
-      db.prepare('INSERT INTO kanban_card_log (card_id, agent, note, dispatch_id) VALUES (?, ?, ?, ?)').run(
-        card.id, agentName, `Moved to ${stage} — dispatch #${dispatchId} created`, dispatchId,
-      );
+        db.prepare('INSERT INTO kanban_stage_dispatches (card_id, stage, dispatch_id) VALUES (?, ?, ?)').run(
+          card.id, stage, dispatchId,
+        );
+        db.prepare('INSERT INTO kanban_card_log (card_id, agent, note, dispatch_id) VALUES (?, ?, ?, ?)').run(
+          card.id, agentName, `Moved to ${stage} — dispatch #${dispatchId} created`, dispatchId,
+        );
+        db.prepare("UPDATE kanban_cards SET agent_pending = 1 WHERE id = ?").run(card.id);
+      } else {
+        db.prepare('INSERT INTO kanban_card_log (card_id, agent, note) VALUES (?, ?, ?)').run(
+          card.id, 'Jarvis', `Moved to ${stage}`,
+        );
+      }
 
-      db.prepare("UPDATE kanban_cards SET agent_pending = 1 WHERE id = ?").run(card.id);
-    } else {
-      db.prepare('INSERT INTO kanban_card_log (card_id, agent, note) VALUES (?, ?, ?)').run(
-        card.id, 'Jarvis', `Moved to ${stage}`,
-      );
-    }
+      updated = db.prepare('SELECT * FROM kanban_cards WHERE id = ?').get(card.id);
+    })();
 
-    const updated = db.prepare('SELECT * FROM kanban_cards WHERE id = ?').get(card.id);
     queueObsidianSync(db, 'kanban_card', card.id, updated);
-
     res.json({ card: updated, dispatch_id: dispatchId, agent: agentName });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to move card' });
   }
 });

@@ -38,13 +38,13 @@ function buildKanbanCardNote(payload) {
     ``,
     `**Domain:** ${domain}`,
     `**Stage:** ${p.stage ?? '—'}`,
-    p.agent_pending ? `**Agent:** dispatch pending` : '',
+    ...(p.agent_pending ? [`**Agent:** dispatch pending`] : []),
     ``,
   ];
   if (p.description) {
     lines.push(`## Description`, ``, p.description, ``);
   }
-  return lines.filter((l) => l !== undefined).join('\n');
+  return lines.join('\n');
 }
 
 function buildDispatchNote(payload) {
@@ -92,38 +92,11 @@ async function writeToObsidian(vaultPath, markdown) {
   const token   = process.env.OBSIDIAN_TOKEN;
   if (!baseUrl || !token) throw new Error('OBSIDIAN_URL or OBSIDIAN_TOKEN not set');
 
-  // Encode each path segment but preserve slashes
+  // Obsidian Local REST API always uses a self-signed cert — skip native fetch
+  // entirely and go straight to the raw https module which honours rejectUnauthorized:false.
   const encodedPath = vaultPath.split('/').map(encodeURIComponent).join('/');
   const url = `${baseUrl}/vault/${encodedPath}`;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
-
-  try {
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'text/markdown',
-      },
-      body: markdown,
-      signal: controller.signal,
-      // Node fetch (undici) doesn't honour https.Agent directly; fall back to
-      // a raw https request when the TLS cert is self-signed.
-    });
-    if (!res.ok && res.status !== 204) {
-      throw new Error(`Obsidian API returned ${res.status}`);
-    }
-  } catch (err) {
-    // If it's a TLS error (fetch rejects), retry via raw https
-    if (err.name !== 'AbortError' && err.cause?.code?.includes('CERT')) {
-      await writeViaHttps(url, token, markdown);
-      return;
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
+  await writeViaHttps(url, token, markdown);
 }
 
 function writeViaHttps(url, token, body) {

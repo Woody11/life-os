@@ -59,14 +59,15 @@ router.patch('/:id', (req, res) => {
     const existing = db.prepare('SELECT * FROM dispatches WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
+    const closes = status === 'done' || status === 'error';
     db.prepare(
       `UPDATE dispatches
        SET status = ?,
            result = ?,
            error = ?,
-           completed_at = CASE WHEN ? IN ('done','error') THEN datetime('now') ELSE completed_at END
+           completed_at = ${closes ? "datetime('now')" : 'completed_at'}
        WHERE id = ?`,
-    ).run(status, result ?? null, errMsg ?? null, status, req.params.id);
+    ).run(status, result ?? null, errMsg ?? null, req.params.id);
 
     const updated = db.prepare('SELECT * FROM dispatches WHERE id = ?').get(req.params.id);
     res.json(updated);

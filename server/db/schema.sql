@@ -54,3 +54,8 @@ CREATE TABLE IF NOT EXISTS obsidian_sync_queue (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   next_attempt_at TEXT
 );
+
+-- Indexes for frequent query patterns
+CREATE INDEX IF NOT EXISTS idx_dispatches_status     ON dispatches(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_kanban_cards_domain   ON kanban_cards(domain, updated_at);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_next       ON obsidian_sync_queue(attempts, next_attempt_at);
