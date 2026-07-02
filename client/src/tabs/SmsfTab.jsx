@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-// "$51,296" style AUD with cents. Cost-basis figures carry cents so allocation
-// math is legible; returns a dash for non-finite input.
 function formatAud(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—';
   return new Intl.NumberFormat('en-AU', {
@@ -16,8 +14,6 @@ function formatAud(value) {
   }).format(Number(value));
 }
 
-// Plain number with thousands separators + 2dp, currency symbol supplied by
-// caller (transaction totals are in native currency, not always AUD).
 function formatMoney(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—';
   return new Intl.NumberFormat('en-AU', {
@@ -38,7 +34,6 @@ function formatSignedPct(value) {
   return `${sign}${n.toFixed(2)}%`;
 }
 
-// "2026-07-01" -> "01 Jul 2026". Parsed as a plain date to avoid TZ shifting.
 function formatDate(iso) {
   if (!iso) return '—';
   const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
@@ -52,7 +47,6 @@ function formatDate(iso) {
   });
 }
 
-// Deviation colour bands: green within ±2%, yellow ±2–5%, red beyond ±5%.
 function deviationClass(deviation) {
   const abs = Math.abs(Number(deviation) || 0);
   if (abs <= 2) return 'text-emerald-400';
@@ -65,13 +59,17 @@ function deviationClass(deviation) {
 // ---------------------------------------------------------------------------
 
 function Card({ children, className = '' }) {
-  return <div className={`rounded-lg bg-slate-800 p-6 ${className}`}>{children}</div>;
+  return (
+    <div className={`rounded-2xl border border-white/5 bg-white/[0.03] p-6 ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 function SectionSpinner({ label = 'Loading…' }) {
   return (
-    <div className="flex items-center gap-3 py-8 text-slate-400">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+    <div className="flex items-center gap-3 py-8 text-slate-500">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
       <span className="text-sm">{label}</span>
     </div>
   );
@@ -79,12 +77,12 @@ function SectionSpinner({ label = 'Loading…' }) {
 
 function SectionError({ message, onRetry }) {
   return (
-    <div className="rounded-lg border border-red-800 bg-red-950/60 p-4 text-sm text-red-300">
+    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
       <div>{message || 'Something went wrong.'}</div>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-3 rounded-md bg-red-900 px-3 py-1.5 text-xs font-medium text-red-100 transition-colors hover:bg-red-800"
+          className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
         >
           Retry
         </button>
@@ -127,7 +125,7 @@ function AllocationSection() {
     <Card>
       <h2 className="text-lg font-semibold text-white">Allocation Overview</h2>
       <p className="mt-1 text-xs text-slate-500">
-        Showing cost basis only — live prices not configured
+        Cost basis only — live prices not configured
       </p>
 
       {state.status === 'loading' && <SectionSpinner label="Loading allocation…" />}
@@ -146,7 +144,7 @@ function AllocationSection() {
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
                   <th className="py-2 pr-4 font-medium">Ticker</th>
                   <th className="py-2 pr-4 font-medium">Asset Class</th>
                   <th className="py-2 pr-4 font-medium">Currency</th>
@@ -162,29 +160,17 @@ function AllocationSection() {
                 {rows.map((h) => (
                   <tr
                     key={h.ticker}
-                    className="border-b border-slate-800 text-slate-200 last:border-0"
+                    className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
                   >
-                    <td className="py-2 pr-4 font-semibold text-white">{h.ticker}</td>
-                    <td className="py-2 pr-4 text-slate-400">{h.asset_class}</td>
-                    <td className="py-2 pr-4 text-slate-400">{h.currency}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums">{h.total_quantity}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums">
-                      {formatMoney(h.average_cost)}
-                    </td>
-                    <td className="py-2 pr-4 text-right tabular-nums">
-                      {formatAud(h.cost_basis_aud)}
-                    </td>
-                    <td className="py-2 pr-4 text-right tabular-nums">
-                      {formatPct(h.actual_allocation_pct)}
-                    </td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-slate-400">
-                      {formatPct(h.target_allocation)}
-                    </td>
-                    <td
-                      className={`py-2 text-right font-medium tabular-nums ${deviationClass(
-                        h.deviation,
-                      )}`}
-                    >
+                    <td className="py-2.5 pr-4 font-semibold text-white">{h.ticker}</td>
+                    <td className="py-2.5 pr-4 text-slate-400">{h.asset_class}</td>
+                    <td className="py-2.5 pr-4 text-slate-400">{h.currency}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">{h.total_quantity}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatMoney(h.average_cost)}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatAud(h.cost_basis_aud)}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatPct(h.actual_allocation_pct)}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums text-slate-400">{formatPct(h.target_allocation)}</td>
+                    <td className={`py-2.5 text-right font-medium tabular-nums ${deviationClass(h.deviation)}`}>
                       {formatSignedPct(h.deviation)}
                     </td>
                   </tr>
@@ -193,8 +179,8 @@ function AllocationSection() {
             </table>
           </div>
 
-          <div className="mt-6">
-            <div className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="mt-6 border-t border-white/[0.06] pt-5">
+            <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
               Total portfolio cost basis
             </div>
             <div className="mt-1 text-3xl font-bold text-white">
@@ -257,7 +243,7 @@ function TransactionSection() {
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
                   <th className="py-2 pr-4 font-medium">Date</th>
                   <th className="py-2 pr-4 font-medium">Type</th>
                   <th className="py-2 pr-4 font-medium">Ticker</th>
@@ -272,24 +258,18 @@ function TransactionSection() {
                   return (
                     <tr
                       key={t.id}
-                      className={`border-b border-slate-800 text-slate-200 last:border-0 border-l-2 ${
+                      className={`border-b border-white/[0.04] text-slate-200 last:border-0 border-l-2 transition-colors hover:bg-white/[0.02] ${
                         isBuy ? 'border-l-emerald-500' : 'border-l-red-500'
                       }`}
                     >
-                      <td className="py-2 pl-3 pr-4 text-slate-300">{formatDate(t.date)}</td>
-                      <td
-                        className={`py-2 pr-4 font-medium ${
-                          isBuy ? 'text-emerald-400' : 'text-red-400'
-                        }`}
-                      >
+                      <td className="py-2.5 pl-3 pr-4 text-slate-300">{formatDate(t.date)}</td>
+                      <td className={`py-2.5 pr-4 font-medium ${isBuy ? 'text-emerald-400' : 'text-red-400'}`}>
                         {t.type}
                       </td>
-                      <td className="py-2 pr-4 font-semibold text-white">{t.ticker}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{t.quantity}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {formatMoney(t.price_per_share)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
+                      <td className="py-2.5 pr-4 font-semibold text-white">{t.ticker}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{t.quantity}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatMoney(t.price_per_share)}</td>
+                      <td className="py-2.5 text-right tabular-nums">
                         {formatMoney(t.total_amount)}{' '}
                         <span className="text-xs text-slate-500">{t.currency}</span>
                       </td>
@@ -298,7 +278,7 @@ function TransactionSection() {
                 })}
                 {txns.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
                       No transactions.
                     </td>
                   </tr>
@@ -310,7 +290,7 @@ function TransactionSection() {
           {limit <= 20 && txns.length >= 20 && (
             <button
               onClick={() => setLimit(50)}
-              className="mt-4 rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-600"
+              className="mt-4 rounded-xl border border-white/5 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-white"
             >
               Load more
             </button>
@@ -331,9 +311,8 @@ const DEFAULT_PROMPT =
 function DispatchSection() {
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', text }
+  const [feedback, setFeedback] = useState(null);
 
-  // Auto-clear a success confirmation after 3 seconds.
   useEffect(() => {
     if (feedback?.type !== 'success') return undefined;
     const timer = setTimeout(() => setFeedback(null), 3000);
@@ -362,7 +341,7 @@ function DispatchSection() {
   return (
     <Card>
       <h2 className="text-lg font-semibold text-white">Dispatch Buffet</h2>
-      <p className="mt-1 text-sm text-slate-400">
+      <p className="mt-1 text-xs text-slate-500">
         Send current portfolio to Buffet for analysis
       </p>
 
@@ -370,24 +349,24 @@ function DispatchSection() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         rows={5}
-        className="mt-4 w-full resize-y rounded-md border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+        className="mt-5 w-full resize-y rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500/50 focus:outline-none transition-colors"
       />
 
       <button
         onClick={handleDispatch}
         disabled={submitting || !prompt.trim()}
-        className="mt-3 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-3 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Dispatching…' : 'Dispatch'}
       </button>
 
       {feedback?.type === 'success' && (
-        <div className="mt-3 rounded-md border border-emerald-800 bg-emerald-950/60 p-3 text-sm text-emerald-300">
+        <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-emerald-300">
           {feedback.text}
         </div>
       )}
       {feedback?.type === 'error' && (
-        <div className="mt-3 rounded-md border border-red-800 bg-red-950/60 p-3 text-sm text-red-300">
+        <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-300">
           {feedback.text}
         </div>
       )}
@@ -401,8 +380,11 @@ function DispatchSection() {
 
 export default function SmsfTab() {
   return (
-    <div className="mx-auto max-w-6xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">SMSF</h1>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-8">
+        <p className="text-sm font-medium text-indigo-400">Portfolio</p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">SMSF</h1>
+      </div>
 
       <div className="space-y-6">
         <AllocationSection />

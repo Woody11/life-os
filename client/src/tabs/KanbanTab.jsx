@@ -4,14 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 // Shared UI atoms
 // ---------------------------------------------------------------------------
 
-function Card({ children, className = '' }) {
-  return <div className={`rounded-lg bg-slate-800 p-4 ${className}`}>{children}</div>;
-}
-
 function SectionSpinner({ label = 'Loading…' }) {
   return (
-    <div className="flex items-center gap-3 py-8 text-slate-400">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
+    <div className="flex items-center gap-3 py-8 text-slate-500">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
       <span className="text-sm">{label}</span>
     </div>
   );
@@ -23,30 +19,30 @@ function SectionSpinner({ label = 'Loading…' }) {
 
 function ConfirmModal({ card, targetStage, agent, onConfirm, onCancel, loading }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl bg-slate-800 p-6 shadow-2xl border border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1526] p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-white">Dispatch {agent}?</h3>
         <p className="mt-3 text-sm text-slate-300">
           Moving{' '}
           <span className="font-medium text-white">"{card.title}"</span>{' '}
-          to <span className="font-medium text-sky-400">{targetStage}</span> will automatically
+          to <span className="font-medium text-indigo-400">{targetStage}</span> will automatically
           dispatch <span className="font-medium text-emerald-400">{agent}</span> to action this stage.
         </p>
-        <div className="mt-4 rounded-md bg-slate-900 p-3 text-xs text-slate-400">
+        <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.04] p-3 text-xs text-slate-400">
           {agent} will receive a task prompt based on the card title and description.
         </div>
-        <div className="mt-5 flex gap-3 justify-end">
+        <div className="mt-5 flex justify-end gap-3">
           <button
             onClick={onCancel}
             disabled={loading}
-            className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="rounded-md bg-sky-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Dispatching…' : `Confirm & dispatch ${agent}`}
           </button>
@@ -61,10 +57,10 @@ function ConfirmModal({ card, targetStage, agent, onConfirm, onCancel, loading }
 // ---------------------------------------------------------------------------
 
 function AddCardModal({ domain, onAdd, onCancel }) {
-  const [title, setTitle]  = useState('');
-  const [desc, setDesc]    = useState('');
+  const [title, setTitle]   = useState('');
+  const [desc, setDesc]     = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError]  = useState(null);
+  const [error, setError]   = useState(null);
 
   async function handleAdd() {
     if (!title.trim()) return;
@@ -86,8 +82,8 @@ function AddCardModal({ domain, onAdd, onCancel }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl bg-slate-800 p-6 shadow-2xl border border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1526] p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-white">
           Add card — {domain.toUpperCase()}
         </h3>
@@ -98,28 +94,28 @@ function AddCardModal({ domain, onAdd, onCancel }) {
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="Card title…"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-500/50 focus:outline-none transition-colors"
           />
           <textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={3}
             placeholder="Description (optional)…"
-            className="w-full resize-none rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+            className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-500/50 focus:outline-none transition-colors"
           />
           {error && <p className="text-xs text-red-400">{error}</p>}
         </div>
-        <div className="mt-4 flex gap-3 justify-end">
+        <div className="mt-4 flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-white/[0.06]"
           >
             Cancel
           </button>
           <button
             onClick={handleAdd}
             disabled={saving || !title.trim()}
-            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Adding…' : 'Add card'}
           </button>
@@ -130,11 +126,11 @@ function AddCardModal({ domain, onAdd, onCancel }) {
 }
 
 // ---------------------------------------------------------------------------
-// Card detail panel (inline, shown when card is clicked)
+// Card detail panel
 // ---------------------------------------------------------------------------
 
 function CardDetail({ card, onClose, onDelete, pipeline }) {
-  const [log, setLog]       = useState([]);
+  const [log, setLog]               = useState([]);
   const [logLoading, setLogLoading] = useState(true);
 
   useEffect(() => {
@@ -155,40 +151,50 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-slate-800 border border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between p-5 border-b border-slate-700">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0d1526] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between border-b border-white/[0.06] p-5">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
               {card.domain.toUpperCase()} · {card.stage}
             </p>
             <h3 className="mt-1 text-lg font-semibold text-white">{card.title}</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-xl leading-none text-slate-500 transition-colors hover:text-white">
+            ×
+          </button>
         </div>
 
-        <div className="p-5 space-y-4 max-h-96 overflow-y-auto">
+        <div className="max-h-96 space-y-4 overflow-y-auto p-5">
           {card.description && (
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Description</p>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">Description</p>
               <p className="text-sm text-slate-300">{card.description}</p>
             </div>
           )}
 
           {card.agent_pending === 1 && (
-            <div className="rounded-md border border-sky-800 bg-sky-950/60 p-3 text-xs text-sky-300">
+            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-indigo-300">
               Agent dispatch pending for this stage
             </div>
           )}
 
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Activity</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Activity</p>
             {logLoading && <p className="text-xs text-slate-500">Loading…</p>}
-            {!logLoading && log.length === 0 && <p className="text-xs text-slate-500">No activity yet.</p>}
+            {!logLoading && log.length === 0 && (
+              <p className="text-xs text-slate-500">No activity yet.</p>
+            )}
             <div className="space-y-2">
               {log.map((entry) => (
                 <div key={entry.id} className="flex gap-2 text-xs">
-                  <span className="text-slate-500 shrink-0">{relTime(entry.created_at)}</span>
+                  <span className="shrink-0 text-slate-600">{relTime(entry.created_at)}</span>
                   <span className="font-medium text-slate-400">{entry.agent}</span>
                   <span className="text-slate-400">{entry.note}</span>
                 </div>
@@ -197,14 +203,17 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
           </div>
         </div>
 
-        <div className="flex justify-between items-center p-4 border-t border-slate-700">
+        <div className="flex items-center justify-between border-t border-white/[0.06] p-4">
           <button
             onClick={() => onDelete(card.id)}
-            className="text-xs text-red-400 hover:text-red-300"
+            className="text-xs text-red-400 transition-colors hover:text-red-300"
           >
             Delete card
           </button>
-          <button onClick={onClose} className="rounded-md bg-slate-700 px-4 py-1.5 text-sm text-slate-200 hover:bg-slate-600">
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-1.5 text-sm text-slate-200 transition-colors hover:bg-white/[0.08]"
+          >
             Close
           </button>
         </div>
@@ -220,13 +229,13 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
 function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCard }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-semibold text-white">
           {domain === 'mbs' ? 'Macro Bricks Studio' : 'SMSF'}
         </h2>
         <button
           onClick={() => onAddCard(domain)}
-          className="rounded-md bg-slate-700 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-slate-600 transition-colors"
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-white"
         >
           + Add card
         </button>
@@ -237,17 +246,17 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
           const stageCards = cards.filter((c) => c.stage === stage);
           const agentName  = pipeline.agents[stage];
           return (
-            <div key={stage} className="min-w-48 w-48 shrink-0">
+            <div key={stage} className="w-48 min-w-48 shrink-0">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   {stage}
                 </span>
                 {agentName && (
-                  <span className="text-xs text-sky-500">{agentName}</span>
+                  <span className="text-xs text-indigo-400">{agentName}</span>
                 )}
               </div>
 
-              <div className="space-y-2 min-h-16 rounded-lg bg-slate-900/50 p-2">
+              <div className="min-h-16 space-y-2 rounded-xl border border-white/[0.04] bg-black/20 p-2">
                 {stageCards.map((card) => (
                   <KanbanCardTile
                     key={card.id}
@@ -258,7 +267,7 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
                   />
                 ))}
                 {stageCards.length === 0 && (
-                  <p className="text-center text-xs text-slate-600 py-3">—</p>
+                  <p className="py-3 text-center text-xs text-slate-700">—</p>
                 )}
               </div>
             </div>
@@ -280,13 +289,16 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
   const canMoveFwd  = currentIdx < pipeline.stages.length - 1;
 
   return (
-    <div className="relative rounded-md bg-slate-800 border border-slate-700 p-2.5 shadow-sm hover:border-slate-500 transition-colors">
+    <div className="relative rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 shadow-sm transition-colors hover:border-white/10 hover:bg-white/[0.06]">
       {card.agent_pending === 1 && (
-        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-sky-400 animate-pulse" title="Agent dispatch pending" />
+        <span
+          className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-indigo-400"
+          title="Agent dispatch pending"
+        />
       )}
 
       <p
-        className="text-xs font-medium text-slate-100 pr-3 cursor-pointer hover:text-white"
+        className="cursor-pointer pr-3 text-xs font-medium text-slate-100 transition-colors hover:text-white"
         onClick={onClick}
       >
         {card.title}
@@ -296,7 +308,7 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
         {canMoveBack && (
           <button
             onClick={() => onMove(pipeline.stages[currentIdx - 1])}
-            className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+            className="rounded px-1.5 py-0.5 text-xs text-slate-600 transition-colors hover:bg-white/[0.08] hover:text-slate-300"
             title={`Move back to ${pipeline.stages[currentIdx - 1]}`}
           >
             ←
@@ -305,7 +317,7 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
         {canMoveFwd && (
           <button
             onClick={() => onMove(pipeline.stages[currentIdx + 1])}
-            className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+            className="rounded px-1.5 py-0.5 text-xs text-slate-600 transition-colors hover:bg-white/[0.08] hover:text-slate-300"
             title={`Move to ${pipeline.stages[currentIdx + 1]}`}
           >
             →
@@ -313,7 +325,7 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
         )}
         <button
           onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
-          className="ml-auto rounded px-1 py-0.5 text-xs text-slate-500 hover:bg-slate-700 hover:text-slate-300"
+          className="ml-auto rounded px-1 py-0.5 text-xs text-slate-600 transition-colors hover:bg-white/[0.08] hover:text-slate-300"
           title="Move to stage"
         >
           ⋯
@@ -321,17 +333,17 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
       </div>
 
       {menuOpen && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-md border border-slate-700 bg-slate-800 py-1 shadow-xl">
+        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-xl border border-white/10 bg-[#0d1526] py-1 shadow-xl">
           {pipeline.stages.map((s) => (
             <button
               key={s}
               onClick={() => { setMenuOpen(false); onMove(s); }}
               disabled={s === card.stage}
-              className="block w-full px-3 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-700 disabled:text-slate-600 disabled:cursor-default"
+              className="block w-full px-3 py-1.5 text-left text-xs text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-default disabled:text-slate-600"
             >
               {s}
               {pipeline.agents[s] && (
-                <span className="ml-1 text-sky-500">({pipeline.agents[s]})</span>
+                <span className="ml-1 text-indigo-400">({pipeline.agents[s]})</span>
               )}
             </button>
           ))}
@@ -351,10 +363,9 @@ export default function KanbanTab() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
 
-  // Modal state
-  const [confirmPending, setConfirmPending] = useState(null); // { card, targetStage, agent }
+  const [confirmPending, setConfirmPending] = useState(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
-  const [addDomain, setAddDomain]           = useState(null); // 'mbs' | 'smsf' | null
+  const [addDomain, setAddDomain]           = useState(null);
   const [detailCard, setDetailCard]         = useState(null);
 
   const load = useCallback(async () => {
@@ -437,27 +448,42 @@ export default function KanbanTab() {
     }
   }
 
-  if (loading) return (
-    <div className="mx-auto max-w-7xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Kanban</h1>
-      <SectionSpinner label="Loading boards…" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-8">
+          <p className="text-sm font-medium text-indigo-400">Boards</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Kanban</h1>
+        </div>
+        <SectionSpinner label="Loading boards…" />
+      </div>
+    );
+  }
 
-  if (error) return (
-    <div className="mx-auto max-w-7xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Kanban</h1>
-      <div className="rounded-lg border border-red-800 bg-red-950/60 p-4 text-sm text-red-300">{error}</div>
-    </div>
-  );
+  if (error) {
+    return (
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-8">
+          <p className="text-sm font-medium text-indigo-400">Boards</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Kanban</h1>
+        </div>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Kanban</h1>
+    <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mb-8">
+        <p className="text-sm font-medium text-indigo-400">Boards</p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Kanban</h1>
+      </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {pipelines && Object.entries(pipelines).map(([domain, pipeline]) => (
-          <div key={domain} className="rounded-lg bg-slate-800/50 border border-slate-700 p-5">
+          <div key={domain} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
             <KanbanBoard
               domain={domain}
               pipeline={pipeline}
@@ -470,7 +496,6 @@ export default function KanbanTab() {
         ))}
       </div>
 
-      {/* Confirmation modal */}
       {confirmPending && (
         <ConfirmModal
           card={confirmPending.card}
@@ -482,7 +507,6 @@ export default function KanbanTab() {
         />
       )}
 
-      {/* Add card modal */}
       {addDomain && (
         <AddCardModal
           domain={addDomain}
@@ -491,7 +515,6 @@ export default function KanbanTab() {
         />
       )}
 
-      {/* Card detail panel */}
       {detailCard && (
         <CardDetail
           card={detailCard}
