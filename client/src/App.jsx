@@ -8,6 +8,7 @@ import HomeTab from './tabs/HomeTab.jsx';
 import SmsfTab from './tabs/SmsfTab.jsx';
 import MbsTab from './tabs/MbsTab.jsx';
 import DispatchTab from './tabs/DispatchTab.jsx';
+import KanbanTab from './tabs/KanbanTab.jsx';
 
 // Placeholder tabs — filled in by later blocks. Kept inline (tiny, no logic).
 const Placeholder = ({ block }) => (
@@ -57,7 +58,7 @@ export default function App() {
             <Route path="/smsf" element={<SmsfTab />} />
             <Route path="/mbs" element={<MbsTab />} />
             <Route path="/dispatch" element={<DispatchTab />} />
-            <Route path="/kanban" element={<Placeholder block={5} />} />
+            <Route path="/kanban" element={<KanbanTab />} />
           </Routes>
         </main>
       </div>

@@ -12,6 +12,7 @@ const homeRouter = require('./routes/home');
 const smsfRouter = require('./routes/smsf');
 const mbsRouter = require('./routes/mbs');
 const dispatchRouter = require('./routes/dispatch');
+const kanbanRouter  = require('./routes/kanban');
 
 const PORT = process.env.PORT || 3030;
 
@@ -30,6 +31,7 @@ app.use('/api/home', homeRouter);
 app.use('/api/smsf', smsfRouter);
 app.use('/api/mbs', mbsRouter);
 app.use('/api/dispatch', dispatchRouter);
+app.use('/api/kanban',  kanbanRouter);
 
 // Serve the built frontend. In production the client is compiled to
 // client/dist by Vite and copied into the image; Express serves it as static
