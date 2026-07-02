@@ -13,6 +13,7 @@ const smsfRouter = require('./routes/smsf');
 const mbsRouter = require('./routes/mbs');
 const dispatchRouter = require('./routes/dispatch');
 const kanbanRouter  = require('./routes/kanban');
+const { startObsidianSync } = require('./sync/obsidian');
 
 const PORT = process.env.PORT || 3030;
 
@@ -48,4 +49,5 @@ app.get('/*splat', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[life-os] server listening on port ${PORT}`);
+  startObsidianSync();
 });
