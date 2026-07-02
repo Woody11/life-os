@@ -1,16 +1,12 @@
 const express = require('express');
 const { getDb } = require('../db/init');
+const { USD_TO_AUD } = require('../config');
 
 const router = express.Router();
 
 // Per-upstream fetch timeout. Kept short so one dead dependency can't stall the
 // aggregated Home response — the tab polls this and must stay responsive.
 const FETCH_TIMEOUT_MS = 4000;
-
-// Fixed AUD/USD conversion rate. WealthCanvas exposes only average cost +
-// quantity (no live prices), so USD positions are converted with this hardcoded
-// fallback until a live price/FX source is wired in (later block).
-const USD_TO_AUD = 1.55;
 
 /**
  * GET JSON from a URL with a hard timeout. Resolves to the parsed body, or
