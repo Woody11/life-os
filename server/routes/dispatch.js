@@ -3,34 +3,51 @@ const { getDb } = require('../db/init');
 
 const router = express.Router();
 
-// Canonical roster of dispatchable agents. The UI reads this list (rather than
-// hardcoding names) so adding an agent is a one-line change here. Full OpenClaw
-// integration — actually running the agent — lands in Block 4; for now dispatch
-// just records the request.
 const AGENTS = [
-  'Bazza',
-  'Jarvis',
-  'Sherlock',
-  'Maverick',
-  'Shakespeare',
-  'Statty',
-  'Linus',
-  'Buffet',
+  { name: 'Bazza',       role: 'System coordinator & front door' },
+  { name: 'Jarvis',      role: 'Ops & project manager' },
+  { name: 'Sherlock',    role: 'Deep research' },
+  { name: 'Maverick',    role: 'Marketing strategy' },
+  { name: 'Shakespeare', role: 'Content writing & SEO' },
+  { name: 'Statty',      role: 'YouTube analytics' },
+  { name: 'Linus',       role: 'Full-stack dev & automation' },
+  { name: 'Buffet',      role: 'SMSF financial analyst' },
 ];
 
-/**
- * GET /api/dispatch/agents — the roster the Dispatch UI populates from.
- */
+/** GET /api/dispatch/agents */
 router.get('/agents', (_req, res) => {
   res.json({ agents: AGENTS });
 });
 
-/**
- * POST /api/dispatch — record a dispatch request (Block 2 stub).
- *
- * Inserts a pending row into `dispatches` and echoes the new id/status/agent.
- * Real agent execution is wired in Block 4; this only persists the intent.
- */
+/** GET /api/dispatch — recent dispatches, newest first */
+router.get('/', (_req, res) => {
+  try {
+    const rows = getDb()
+      .prepare(
+        `SELECT id, agent, prompt, status, created_at, completed_at, result
+         FROM dispatches ORDER BY created_at DESC LIMIT 50`,
+      )
+      .all();
+    res.json({ dispatches: rows });
+  } catch {
+    res.status(500).json({ error: 'Failed to load dispatches' });
+  }
+});
+
+/** GET /api/dispatch/:id — single dispatch */
+router.get('/:id', (req, res) => {
+  try {
+    const row = getDb()
+      .prepare('SELECT * FROM dispatches WHERE id = ?')
+      .get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
+  } catch {
+    res.status(500).json({ error: 'Failed to load dispatch' });
+  }
+});
+
+/** POST /api/dispatch — record a new dispatch */
 router.post('/', (req, res) => {
   const { agent, prompt } = req.body ?? {};
 
@@ -44,6 +61,7 @@ router.post('/', (req, res) => {
       .run(agent.trim(), prompt.trim(), 'pending');
 
     res.status(201).json({
+      id: info.lastInsertRowid,
       dispatch_id: info.lastInsertRowid,
       status: 'pending',
       agent: agent.trim(),
