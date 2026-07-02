@@ -8,6 +8,9 @@ const path = require('node:path');
 const express = require('express');
 const { initDb } = require('./db/init');
 const statusRouter = require('./routes/status');
+const homeRouter = require('./routes/home');
+const smsfRouter = require('./routes/smsf');
+const mbsRouter = require('./routes/mbs');
 
 const PORT = process.env.PORT || 3030;
 
@@ -22,6 +25,9 @@ app.use(express.json());
 // API routes are mounted before the static handler so /api/* is never shadowed
 // by the SPA fallback below.
 app.use('/api/status', statusRouter);
+app.use('/api/home', homeRouter);
+app.use('/api/smsf', smsfRouter);
+app.use('/api/mbs', mbsRouter);
 
 // Serve the built frontend. In production the client is compiled to
 // client/dist by Vite and copied into the image; Express serves it as static
