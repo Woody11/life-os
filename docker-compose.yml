@@ -3,8 +3,7 @@ services:
     build: .
     container_name: life-os
     restart: unless-stopped
-    ports:
-      - "3030:3030"
+    network_mode: host
     volumes:
       - /mnt/user/appdata/life-os/data:/data
     env_file:
