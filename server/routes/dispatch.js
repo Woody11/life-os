@@ -46,10 +46,36 @@ router.get('/', (_req, res) => {
   }
 });
 
+/** GET /api/dispatch/stats — summary counts for the Mission Control top bar */
+router.get('/stats', (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = db
+      .prepare(`SELECT status, COUNT(*) as count FROM dispatches GROUP BY status`)
+      .all();
+
+    const byStatus = { pending: 0, running: 0, review: 0, done: 0, error: 0 };
+    let total = 0;
+    for (const { status, count } of rows) {
+      if (status in byStatus) byStatus[status] = count;
+      else byStatus[status] = count;
+      total += count;
+    }
+
+    const activeAgents = db
+      .prepare(`SELECT COUNT(DISTINCT agent) as n FROM dispatches WHERE status = 'running'`)
+      .get().n;
+
+    res.json({ total, byStatus, activeAgents });
+  } catch {
+    res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
 /** PATCH /api/dispatch/:id — update status + result (called by Bazza after agent completes) */
 router.patch('/:id', (req, res) => {
   const { status, result, error: errMsg } = req.body ?? {};
-  const allowed = ['running', 'done', 'error'];
+  const allowed = ['running', 'review', 'done', 'error'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}` });
   }
