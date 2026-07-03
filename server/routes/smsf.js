@@ -169,7 +169,19 @@ router.get('/dividends', async (_req, res) => {
   try {
     const data = await fetchJson(`${process.env.WEALTHCANVAS_URL}/api/holdings`);
     const dividends = await gatherDividends(data);
-    res.json({ dividends });
+
+    // Attach share count so the frontend can compute annual dividend totals.
+    const qtyByTicker = {};
+    for (const h of data.holdings ?? []) {
+      qtyByTicker[h.ticker] = Number(h.total_quantity ?? 0) || null;
+    }
+
+    const enriched = dividends.map((d) => ({
+      ...d,
+      total_quantity: qtyByTicker[d.ticker] ?? null,
+    }));
+
+    res.json({ dividends: enriched });
   } catch {
     res.status(502).json({ error: 'WealthCanvas unavailable' });
   }

@@ -251,7 +251,7 @@ async function fetchDividend(holding) {
     const { crumb, cookie } = await getCrumb(force);
     const url =
       `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${sym}` +
-      `?modules=summaryDetail,calendarEvents&crumb=${encodeURIComponent(crumb)}`;
+      `?modules=summaryDetail,calendarEvents,defaultKeyStatistics&crumb=${encodeURIComponent(crumb)}`;
     const res = await fetchWithTimeout(url, {
       headers: cookie ? { Cookie: cookie } : {},
     });
@@ -279,10 +279,17 @@ async function fetchDividend(holding) {
     if (!result) return nulls;
 
     const sd = result.summaryDetail ?? {};
+    const ks = result.defaultKeyStatistics ?? {};
     const earnings = result.calendarEvents?.earnings ?? {};
     const nextReport = Array.isArray(earnings.earningsDate)
       ? earnings.earningsDate[0]?.raw
       : null;
+
+    // Yahoo's summaryDetail.dividendDate is unreliable for non-US stocks;
+    // fall back to defaultKeyStatistics.lastDividendDate when it's missing.
+    const payDate =
+      unixToIsoDate(sd.dividendDate?.raw) ??
+      unixToIsoDate(ks.lastDividendDate?.raw);
 
     return {
       ticker: holding.ticker,
@@ -290,7 +297,7 @@ async function fetchDividend(holding) {
         ? Number(sd.dividendRate.raw)
         : null,
       ex_div_date: unixToIsoDate(sd.exDividendDate?.raw),
-      pay_date: unixToIsoDate(sd.dividendDate?.raw),
+      pay_date: payDate,
       next_report_date: unixToIsoDate(nextReport),
     };
   } catch {

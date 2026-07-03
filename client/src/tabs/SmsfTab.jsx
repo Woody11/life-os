@@ -330,7 +330,9 @@ function DividendSection() {
             <thead>
               <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
                 <th className="py-2 pr-4 font-medium">Ticker</th>
+                <th className="py-2 pr-4 text-right font-medium">Shares</th>
                 <th className="py-2 pr-4 text-right font-medium">Annual Div/Share</th>
+                <th className="py-2 pr-4 text-right font-medium">Annual Total</th>
                 <th className="py-2 pr-4 font-medium">Ex-Div Date</th>
                 <th className="py-2 pr-4 font-medium">Pay Date</th>
                 <th className="py-2 font-medium">Next Report Date</th>
@@ -343,8 +345,16 @@ function DividendSection() {
                   className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
                 >
                   <td className="py-2.5 pr-4 font-semibold text-white">{d.ticker}</td>
+                  <td className="py-2.5 pr-4 text-right tabular-nums text-slate-300">
+                    {d.total_quantity ?? '—'}
+                  </td>
                   <td className="py-2.5 pr-4 text-right tabular-nums">
                     {d.dividend_amount == null ? '—' : formatMoney(d.dividend_amount)}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right tabular-nums text-emerald-400 font-medium">
+                    {d.dividend_amount != null && d.total_quantity != null
+                      ? formatAud(Math.round(d.dividend_amount * d.total_quantity * 100) / 100)
+                      : '—'}
                   </td>
                   <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.ex_div_date)}</td>
                   <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.pay_date)}</td>
@@ -353,7 +363,7 @@ function DividendSection() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-500">
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
                     No dividend data.
                   </td>
                 </tr>
