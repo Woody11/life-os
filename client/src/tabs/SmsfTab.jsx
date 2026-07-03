@@ -112,10 +112,13 @@ function AllocationSection() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
   // Live prices load independently and never block the allocation table.
   const [prices, setPrices] = useState({ status: 'loading', byTicker: {}, totals: null });
+  // Annual dividend total — best-effort, degrades to null.
+  const [annualDivTotal, setAnnualDivTotal] = useState(null);
 
   const load = useCallback(async (signal) => {
     setState({ status: 'loading', data: null, error: null });
     setPrices({ status: 'loading', byTicker: {}, totals: null });
+    setAnnualDivTotal(null);
 
     // Allocation (cost basis / deviation) is the primary payload.
     try {
@@ -139,6 +142,23 @@ function AllocationSection() {
     } catch (err) {
       if (err.name === 'AbortError') return;
       setPrices({ status: 'error', byTicker: {}, totals: null });
+    }
+
+    // Annual dividends — sum shares × annual_div_per_share across all holdings.
+    try {
+      const res = await fetch('/api/smsf/dividends', { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const total = (json.dividends ?? []).reduce((sum, d) => {
+        if (d.dividend_amount != null && d.total_quantity != null) {
+          return sum + d.dividend_amount * d.total_quantity;
+        }
+        return sum;
+      }, 0);
+      setAnnualDivTotal(total > 0 ? Math.round(total * 100) / 100 : null);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      // Silently degrade — dividend total is non-critical
     }
   }, []);
 
@@ -268,6 +288,20 @@ function AllocationSection() {
                 </div>
                 <div className={`mt-1 text-xs font-medium ${pnlClass(totals.total_pnl_pct)}`}>
                   {formatSignedPct(totals.total_pnl_pct)}
+                </div>
+              </div>
+            )}
+
+            {annualDivTotal != null && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Annual Dividends
+                </div>
+                <div className="mt-1 text-3xl font-bold text-emerald-400">
+                  {formatAud(annualDivTotal)}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  est. annual income
                 </div>
               </div>
             )}
