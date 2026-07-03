@@ -172,7 +172,7 @@ router.get('/dividends', async (_req, res) => {
 
     // Attach share count so the frontend can compute annual dividend totals.
     const qtyByTicker = {};
-    for (const h of data.holdings ?? []) {
+    for (const h of data.data ?? []) {
       qtyByTicker[h.ticker] = Number(h.total_quantity ?? 0) || null;
     }
 
