@@ -1,5 +1,6 @@
 const express = require('express');
 const { USD_TO_AUD } = require('../config');
+const { gatherPrices, gatherDividends } = require('../lib/yahoo');
 
 const router = express.Router();
 
@@ -123,6 +124,52 @@ router.get('/summary', async (_req, res) => {
   try {
     const data = await fetchJson(`${process.env.WEALTHCANVAS_URL}/api/holdings`);
     res.json(computeSummary(data));
+  } catch {
+    res.status(502).json({ error: 'WealthCanvas unavailable' });
+  }
+});
+
+/**
+ * GET /api/smsf/prices — live prices + unrealised P&L per holding.
+ *
+ * Reads WealthCanvas holdings, fetches each ticker's live price from Yahoo, and
+ * returns per-holding market value / P&L plus portfolio totals. Individual
+ * tickers that fail pricing degrade to null live fields (see gatherPrices).
+ * Only a WealthCanvas failure yields a 502.
+ */
+router.get('/prices', async (_req, res) => {
+  try {
+    const data = await fetchJson(`${process.env.WEALTHCANVAS_URL}/api/holdings`);
+    const { rows, totals } = await gatherPrices(data);
+    res.json({
+      holdings: rows,
+      total_market_value_aud: totals.total_market_value_aud,
+      total_cost_basis_aud: totals.total_cost_basis_aud,
+      total_pnl_aud: totals.total_pnl_aud,
+      total_pnl_pct: totals.total_pnl_pct,
+      day_pnl_aud: totals.day_pnl_aud,
+      day_pnl_pct: totals.day_pnl_pct,
+      priced_count: totals.priced_count,
+      holdings_count: totals.holdings_count,
+    });
+  } catch {
+    res.status(502).json({ error: 'WealthCanvas unavailable' });
+  }
+});
+
+/**
+ * GET /api/smsf/dividends — dividend + earnings calendar per holding.
+ *
+ * Reads WealthCanvas holdings and returns each ticker's annual dividend rate,
+ * ex-dividend date, payment date and next earnings/report date from Yahoo.
+ * Tickers Yahoo can't answer for degrade to nulls; only a WealthCanvas failure
+ * yields a 502.
+ */
+router.get('/dividends', async (_req, res) => {
+  try {
+    const data = await fetchJson(`${process.env.WEALTHCANVAS_URL}/api/holdings`);
+    const dividends = await gatherDividends(data);
+    res.json({ dividends });
   } catch {
     res.status(502).json({ error: 'WealthCanvas unavailable' });
   }

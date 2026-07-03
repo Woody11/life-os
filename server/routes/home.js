@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb } = require('../db/init');
 const { USD_TO_AUD } = require('../config');
+const { gatherPrices } = require('../lib/yahoo');
 
 const router = express.Router();
 
@@ -41,6 +42,7 @@ function computePortfolio(holdingsPayload) {
   }
   return {
     total_cost_basis_aud: Math.round(totalAud * 100) / 100,
+    total_market_value_aud: null,
     pnl_today_aud: null,
     pnl_today_pct: null,
     note: 'Showing cost basis only — live prices not configured',
@@ -122,6 +124,22 @@ router.get('/', async (_req, res) => {
   let portfolio = null;
   if (holdingsResult && !holdingsResult.__error) {
     portfolio = computePortfolio(holdingsResult);
+    // Overlay live prices when available. A pricing failure is non-fatal — the
+    // portfolio slice still returns cost basis; live fields simply stay null.
+    try {
+      const { totals } = await gatherPrices(holdingsResult);
+      if (totals.priced_count > 0) {
+        portfolio.total_market_value_aud = totals.total_market_value_aud;
+        portfolio.pnl_today_aud = totals.day_pnl_aud;
+        portfolio.pnl_today_pct = totals.day_pnl_pct;
+        portfolio.note =
+          totals.priced_count === totals.holdings_count
+            ? 'Live prices — market value and today’s change'
+            : `Live prices for ${totals.priced_count}/${totals.holdings_count} holdings`;
+      }
+    } catch {
+      /* keep cost-basis-only portfolio */
+    }
   } else {
     partial = true;
   }

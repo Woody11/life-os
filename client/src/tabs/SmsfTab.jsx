@@ -95,11 +95,29 @@ function SectionError({ message, onRetry }) {
 // Section A — Allocation Overview
 // ---------------------------------------------------------------------------
 
+function pnlClass(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return 'text-slate-300';
+  return n > 0 ? 'text-emerald-400' : 'text-red-400';
+}
+
+function formatSignedAud(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${formatAud(n)}`;
+}
+
 function AllocationSection() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
+  // Live prices load independently and never block the allocation table.
+  const [prices, setPrices] = useState({ status: 'loading', byTicker: {}, totals: null });
 
   const load = useCallback(async (signal) => {
     setState({ status: 'loading', data: null, error: null });
+    setPrices({ status: 'loading', byTicker: {}, totals: null });
+
+    // Allocation (cost basis / deviation) is the primary payload.
     try {
       const res = await fetch('/api/smsf/summary', { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -108,6 +126,19 @@ function AllocationSection() {
     } catch (err) {
       if (err.name === 'AbortError') return;
       setState({ status: 'error', data: null, error: err.message || 'Failed to load' });
+    }
+
+    // Live prices — best-effort overlay; failure degrades to em-dashes.
+    try {
+      const res = await fetch('/api/smsf/prices', { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const byTicker = {};
+      for (const p of json.holdings ?? []) byTicker[p.ticker] = p;
+      setPrices({ status: 'ready', byTicker, totals: json });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setPrices({ status: 'error', byTicker: {}, totals: null });
     }
   }, []);
 
@@ -121,12 +152,21 @@ function AllocationSection() {
     (a, b) => b.cost_basis_aud - a.cost_basis_aud,
   );
 
+  const totals = prices.totals;
+  const hasLive = prices.status === 'ready' && (totals?.priced_count ?? 0) > 0;
+  const subtitle =
+    prices.status === 'loading'
+      ? 'Loading live prices…'
+      : hasLive
+        ? totals.priced_count === totals.holdings_count
+          ? 'Live prices — market value & unrealised P&L'
+          : `Live prices for ${totals.priced_count}/${totals.holdings_count} holdings · cost basis for the rest`
+        : 'Live prices unavailable — showing cost basis only';
+
   return (
     <Card>
       <h2 className="text-lg font-semibold text-white">Allocation Overview</h2>
-      <p className="mt-1 text-xs text-slate-500">
-        Cost basis only — live prices not configured
-      </p>
+      <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
 
       {state.status === 'loading' && <SectionSpinner label="Loading allocation…" />}
 
@@ -147,46 +187,80 @@ function AllocationSection() {
                 <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
                   <th className="py-2 pr-4 font-medium">Ticker</th>
                   <th className="py-2 pr-4 font-medium">Asset Class</th>
-                  <th className="py-2 pr-4 font-medium">Currency</th>
                   <th className="py-2 pr-4 text-right font-medium">Shares</th>
                   <th className="py-2 pr-4 text-right font-medium">Avg Cost</th>
+                  <th className="py-2 pr-4 text-right font-medium">Price</th>
                   <th className="py-2 pr-4 text-right font-medium">Cost Basis (AUD)</th>
+                  <th className="py-2 pr-4 text-right font-medium">Market Value (AUD)</th>
+                  <th className="py-2 pr-4 text-right font-medium">Unrealised P&amp;L</th>
+                  <th className="py-2 pr-4 text-right font-medium">P&amp;L %</th>
                   <th className="py-2 pr-4 text-right font-medium">Actual %</th>
                   <th className="py-2 pr-4 text-right font-medium">Target %</th>
                   <th className="py-2 text-right font-medium">Deviation</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((h) => (
-                  <tr
-                    key={h.ticker}
-                    className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="py-2.5 pr-4 font-semibold text-white">{h.ticker}</td>
-                    <td className="py-2.5 pr-4 text-slate-400">{h.asset_class}</td>
-                    <td className="py-2.5 pr-4 text-slate-400">{h.currency}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">{h.total_quantity}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatMoney(h.average_cost)}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatAud(h.cost_basis_aud)}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">{formatPct(h.actual_allocation_pct)}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums text-slate-400">{formatPct(h.target_allocation)}</td>
-                    <td className={`py-2.5 text-right font-medium tabular-nums ${deviationClass(h.deviation)}`}>
-                      {formatSignedPct(h.deviation)}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((h) => {
+                  const p = prices.byTicker[h.ticker];
+                  return (
+                    <tr
+                      key={h.ticker}
+                      className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="py-2.5 pr-4 font-semibold text-white">{h.ticker}</td>
+                      <td className="py-2.5 pr-4 text-slate-400">{h.asset_class}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{h.total_quantity}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatMoney(h.average_cost)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatMoney(p?.price)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatAud(h.cost_basis_aud)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatAud(p?.market_value_aud)}</td>
+                      <td className={`py-2.5 pr-4 text-right font-medium tabular-nums ${pnlClass(p?.pnl_aud)}`}>
+                        {formatSignedAud(p?.pnl_aud)}
+                      </td>
+                      <td className={`py-2.5 pr-4 text-right tabular-nums ${pnlClass(p?.pnl_pct)}`}>
+                        {formatSignedPct(p?.pnl_pct)}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatPct(h.actual_allocation_pct)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-400">{formatPct(h.target_allocation)}</td>
+                      <td className={`py-2.5 text-right font-medium tabular-nums ${deviationClass(h.deviation)}`}>
+                        {formatSignedPct(h.deviation)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          <div className="mt-6 border-t border-white/[0.06] pt-5">
-            <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Total portfolio cost basis
+          <div className="mt-6 flex flex-wrap items-end gap-x-12 gap-y-5 border-t border-white/[0.06] pt-5">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                {hasLive ? 'Total market value' : 'Total portfolio cost basis'}
+              </div>
+              <div className="mt-1 text-3xl font-bold text-white">
+                {formatAud(hasLive ? totals.total_market_value_aud : state.data?.total_cost_basis_aud)}{' '}
+                <span className="text-lg font-medium text-slate-400">AUD</span>
+              </div>
+              {hasLive && (
+                <div className="mt-1 text-xs text-slate-500">
+                  Cost basis {formatAud(totals.total_cost_basis_aud)}
+                </div>
+              )}
             </div>
-            <div className="mt-1 text-3xl font-bold text-white">
-              {formatAud(state.data?.total_cost_basis_aud)}{' '}
-              <span className="text-lg font-medium text-slate-400">AUD</span>
-            </div>
+
+            {hasLive && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Unrealised P&amp;L
+                </div>
+                <div className={`mt-1 text-3xl font-bold ${pnlClass(totals.total_pnl_aud)}`}>
+                  {formatSignedAud(totals.total_pnl_aud)}
+                </div>
+                <div className={`mt-1 text-xs font-medium ${pnlClass(totals.total_pnl_pct)}`}>
+                  {formatSignedPct(totals.total_pnl_pct)}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -195,7 +269,95 @@ function AllocationSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Section B — Transaction History
+// Section B — Dividend Calendar
+// ---------------------------------------------------------------------------
+
+function DividendSection() {
+  const [state, setState] = useState({ status: 'loading', data: null, error: null });
+
+  const load = useCallback(async (signal) => {
+    setState({ status: 'loading', data: null, error: null });
+    try {
+      const res = await fetch('/api/smsf/dividends', { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setState({ status: 'ready', data: json.dividends ?? [], error: null });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setState({ status: 'error', data: null, error: err.message || 'Failed to load' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  const rows = state.data ?? [];
+
+  return (
+    <Card>
+      <h2 className="text-lg font-semibold text-white">Dividend Calendar</h2>
+      <p className="mt-1 text-xs text-slate-500">
+        Ex-dividend, payment and next report dates per holding
+      </p>
+
+      {state.status === 'loading' && <SectionSpinner label="Loading dividends…" />}
+
+      {state.status === 'error' && (
+        <div className="mt-4">
+          <SectionError
+            message={`Failed to load dividends: ${state.error}`}
+            onRetry={() => load()}
+          />
+        </div>
+      )}
+
+      {state.status === 'ready' && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
+                <th className="py-2 pr-4 font-medium">Ticker</th>
+                <th className="py-2 pr-4 text-right font-medium">Annual Div/Share</th>
+                <th className="py-2 pr-4 font-medium">Ex-Div Date</th>
+                <th className="py-2 pr-4 font-medium">Pay Date</th>
+                <th className="py-2 font-medium">Next Report Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((d) => (
+                <tr
+                  key={d.ticker}
+                  className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
+                >
+                  <td className="py-2.5 pr-4 font-semibold text-white">{d.ticker}</td>
+                  <td className="py-2.5 pr-4 text-right tabular-nums">
+                    {d.dividend_amount == null ? '—' : formatMoney(d.dividend_amount)}
+                  </td>
+                  <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.ex_div_date)}</td>
+                  <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.pay_date)}</td>
+                  <td className="py-2.5 text-slate-300">{formatDate(d.next_report_date)}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-500">
+                    No dividend data.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section C — Transaction History
 // ---------------------------------------------------------------------------
 
 function TransactionSection() {
@@ -302,7 +464,7 @@ function TransactionSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Section C — Dispatch Buffet
+// Section D — Dispatch Buffet
 // ---------------------------------------------------------------------------
 
 const DEFAULT_PROMPT =
@@ -388,6 +550,8 @@ export default function SmsfTab() {
 
       <div className="space-y-6">
         <AllocationSection />
+
+        <DividendSection />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

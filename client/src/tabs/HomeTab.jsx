@@ -106,6 +106,20 @@ export default function HomeTab() {
   const tasks     = data?.agent_tasks_today;
   const costBasis = portfolio ? formatAud(portfolio.total_cost_basis_aud) : null;
 
+  // Live overlay: prefer market value as the headline when prices are available.
+  const marketValue = portfolio ? formatAud(portfolio.total_market_value_aud) : null;
+  const pnlToday    = portfolio?.pnl_today_aud ?? null;
+  const pnlTodayPct = portfolio?.pnl_today_pct ?? null;
+  const hasLive     = marketValue != null && pnlToday != null;
+
+  const portfolioValue = hasLive ? marketValue : costBasis;
+  const pnlPositive = Number(pnlToday) >= 0;
+  const pnlLine = hasLive
+    ? `${pnlPositive ? '+' : ''}${formatAud(pnlToday)}` +
+      (pnlTodayPct != null ? ` (${pnlPositive ? '+' : ''}${Number(pnlTodayPct).toFixed(2)}%)` : '') +
+      ' today'
+    : null;
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
 
@@ -155,10 +169,20 @@ export default function HomeTab() {
             {/* Portfolio */}
             <StatCard
               label="SMSF Portfolio"
-              value={costBasis ?? <span className="text-slate-600 text-2xl">—</span>}
-              sub="cost basis · live prices not configured"
+              value={portfolioValue ?? <span className="text-slate-600 text-2xl">—</span>}
+              sub={hasLive ? 'market value' : 'cost basis · live prices not configured'}
               accent
-            />
+            >
+              {pnlLine && (
+                <div
+                  className={`mt-2 text-sm font-semibold ${
+                    pnlPositive ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
+                  {pnlLine}
+                </div>
+              )}
+            </StatCard>
 
             {/* Agent tasks */}
             <StatCard
