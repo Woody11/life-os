@@ -202,6 +202,16 @@ function AllocationSection() {
               <tbody>
                 {rows.map((h) => {
                   const p = prices.byTicker[h.ticker];
+                  const liveAllocationPct =
+                    hasLive && p?.market_value_aud != null && totals?.total_market_value_aud > 0
+                      ? Math.round((p.market_value_aud / totals.total_market_value_aud) * 10000) / 100
+                      : null;
+                  const displayAllocationPct = liveAllocationPct ?? h.actual_allocation_pct;
+                  const target = Number(h.target_allocation);
+                  const displayDeviation = Number.isFinite(target)
+                    ? Math.round((displayAllocationPct - target) * 100) / 100
+                    : h.deviation;
+
                   return (
                     <tr
                       key={h.ticker}
@@ -220,10 +230,10 @@ function AllocationSection() {
                       <td className={`py-2.5 pr-4 text-right tabular-nums ${pnlClass(p?.pnl_pct)}`}>
                         {formatSignedPct(p?.pnl_pct)}
                       </td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatPct(h.actual_allocation_pct)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{formatPct(displayAllocationPct)}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-slate-400">{formatPct(h.target_allocation)}</td>
-                      <td className={`py-2.5 text-right font-medium tabular-nums ${deviationClass(h.deviation)}`}>
-                        {formatSignedPct(h.deviation)}
+                      <td className={`py-2.5 text-right font-medium tabular-nums ${deviationClass(displayDeviation)}`}>
+                        {formatSignedPct(displayDeviation)}
                       </td>
                     </tr>
                   );
