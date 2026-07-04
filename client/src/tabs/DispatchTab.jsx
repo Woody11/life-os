@@ -192,15 +192,21 @@ function LiveFeed({ dispatches }) {
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {feed.map((d) => {
           const stamp = d.completed_at || d.created_at;
+          const summary = d.prompt && d.prompt.length > 65 ? d.prompt.slice(0, 65) + '…' : d.prompt;
           return (
-            <div key={d.id} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
-              <Dot status={d.status} />
-              <span className="min-w-0 flex-1 truncate text-xs text-slate-300">
-                <span className="font-medium text-slate-100">{d.agent}</span>
-                <span className="text-slate-600"> · </span>
-                <span className="text-slate-400">{d.status}</span>
-              </span>
-              <span className="shrink-0 text-[10px] text-slate-600">{relativeTime(stamp)}</span>
+            <div key={d.id} className="rounded-lg px-2.5 py-2 hover:bg-white/[0.03]">
+              <div className="flex items-center gap-2.5">
+                <Dot status={d.status} />
+                <span className="min-w-0 flex-1 truncate text-xs text-slate-300">
+                  <span className="font-medium text-slate-100">{d.agent}</span>
+                  <span className="text-slate-600"> · </span>
+                  <span className="text-slate-400">{d.status}</span>
+                </span>
+                <span className="shrink-0 text-[10px] text-slate-600">{relativeTime(stamp)}</span>
+              </div>
+              {summary && (
+                <p className="mt-0.5 ml-[18px] truncate text-[11px] text-slate-600">{summary}</p>
+              )}
             </div>
           );
         })}

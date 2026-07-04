@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,26 @@ function formatPublishDate(iso) {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
   });
 }
+
+function relativeTime(iso) {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+const STATUS_DOT = {
+  pending: 'bg-yellow-400',
+  running: 'bg-indigo-400 animate-pulse',
+  review:  'bg-purple-400',
+  done:    'bg-emerald-400',
+  error:   'bg-red-400',
+};
 
 function formatUpdated(iso) {
   if (!iso) return null;
@@ -76,9 +96,10 @@ function StatCard({ label, value, sub, accent = false, children }) {
 export default function HomeTab() {
   const navigate  = useNavigate();
   const clock     = useClock();
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [data, setData]           = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [dispatches, setDispatches] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +117,21 @@ export default function HomeTab() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/dispatch')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((json) => { if (!cancelled) setDispatches(json.dispatches ?? []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const recentActivity = useMemo(() => {
+    return [...dispatches]
+      .sort((a, b) => new Date(b.completed_at || b.created_at) - new Date(a.completed_at || a.created_at))
+      .slice(0, 8);
+  }, [dispatches]);
 
   const greeting  = getGreeting();
   const timeStr   = clock.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -230,6 +266,36 @@ export default function HomeTab() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ── Recent activity ── */}
+          <div className="mt-8">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Recent Activity</p>
+            {recentActivity.length === 0 ? (
+              <p className="text-sm text-slate-600">No agent activity yet.</p>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-white/5">
+                {recentActivity.map((d, i) => {
+                  const summary = d.prompt && d.prompt.length > 80 ? d.prompt.slice(0, 80) + '…' : d.prompt;
+                  const stamp = d.completed_at || d.created_at;
+                  const dot = STATUS_DOT[d.status] ?? 'bg-slate-600';
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => navigate('/dispatch')}
+                      className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04] ${
+                        i > 0 ? 'border-t border-white/5' : ''
+                      }`}
+                    >
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                      <span className="w-20 shrink-0 text-xs font-medium text-slate-200">{d.agent}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{summary}</span>
+                      <span className="shrink-0 text-[10px] text-slate-600">{relativeTime(stamp)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

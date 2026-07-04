@@ -3,6 +3,27 @@ const { getDb } = require('../db/init');
 
 const router = express.Router();
 
+function wakeOpenClaw(text) {
+  const url = process.env.OPENCLAW_GATEWAY_URL;
+  const token = process.env.OPENCLAW_HOOK_TOKEN;
+  if (!url || !token) return;
+  fetch(`${url}/hooks/wake`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, mode: 'now' }),
+  }).catch(() => {});
+}
+
+function enqueueVaultSync(db, dispatch) {
+  const date = (dispatch.completed_at || dispatch.created_at || '').slice(0, 10);
+  const slug = `${dispatch.id}-${dispatch.agent}`;
+  const vaultPath = `60 Agent System/Dispatches/${date}-${slug}.md`;
+  db.prepare(
+    `INSERT OR IGNORE INTO obsidian_sync_queue (entity_type, entity_id, payload, vault_path)
+     VALUES ('dispatch', ?, ?, ?)`,
+  ).run(dispatch.id, JSON.stringify(dispatch), vaultPath);
+}
+
 const AGENTS = [
   { name: 'Bazza',       role: 'System coordinator & front door' },
   { name: 'Jarvis',      role: 'Ops & project manager' },
@@ -96,6 +117,11 @@ router.patch('/:id', (req, res) => {
     ).run(status, result ?? null, errMsg ?? null, req.params.id);
 
     const updated = db.prepare('SELECT * FROM dispatches WHERE id = ?').get(req.params.id);
+
+    if (status === 'done') {
+      enqueueVaultSync(db, updated);
+    }
+
     res.json(updated);
   } catch {
     res.status(500).json({ error: 'Failed to update dispatch' });
@@ -127,6 +153,8 @@ router.post('/', (req, res) => {
     const info = getDb()
       .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
       .run(agent.trim(), prompt.trim(), 'pending');
+
+    wakeOpenClaw(`New dispatch #${info.lastInsertRowid}: ${agent.trim()} — ${prompt.trim().slice(0, 120)}`);
 
     res.status(201).json({
       id: info.lastInsertRowid,
