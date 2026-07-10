@@ -93,6 +93,35 @@ function StatCard({ label, value, sub, accent = false, children }) {
 // Home tab
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Google panel helpers
+// ---------------------------------------------------------------------------
+
+function formatEventTime(iso, allDay) {
+  if (!iso) return null;
+  if (allDay) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-AU', {
+      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
+    });
+  }
+  return new Date(iso).toLocaleTimeString('en-AU', {
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+function fromDisplay(raw) {
+  if (!raw) return raw;
+  const match = raw.match(/^"?([^"<]+)"?\s*</);
+  return match ? match[1].trim() : raw.replace(/<.*>/, '').trim();
+}
+
+function categoryBadge(labels = []) {
+  if (labels.includes('CATEGORY_PERSONAL'))  return { text: 'Personal',     cls: 'bg-violet-500/20 text-violet-300' };
+  if (labels.includes('CATEGORY_UPDATES'))   return { text: 'Update',       cls: 'bg-sky-500/20 text-sky-300' };
+  return null;
+}
+
 export default function HomeTab() {
   const navigate  = useNavigate();
   const clock     = useClock();
@@ -100,6 +129,8 @@ export default function HomeTab() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [dispatches, setDispatches] = useState([]);
+  const [google, setGoogle]       = useState(null);
+  const [googleLoading, setGoogleLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +155,23 @@ export default function HomeTab() {
       .then((r) => r.ok ? r.json() : Promise.reject())
       .then((json) => { if (!cancelled) setDispatches(json.dispatches ?? []); })
       .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res  = await fetch('/api/google');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (!cancelled) setGoogle(json);
+      } catch {
+        // non-fatal — panels show empty state
+      } finally {
+        if (!cancelled) setGoogleLoading(false);
+      }
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -265,6 +313,91 @@ export default function HomeTab() {
                   {n.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* ── Google: Calendar + Email ── */}
+          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+            {/* Left: Today's schedule */}
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Today's Schedule
+              </p>
+              {googleLoading ? (
+                <div className="flex items-center gap-2 text-slate-600 text-sm">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+                  Loading…
+                </div>
+              ) : !google?.calendar ? (
+                <p className="text-sm text-slate-600">Calendar unavailable.</p>
+              ) : google.calendar.length === 0 ? (
+                <p className="text-sm text-slate-600">No events today.</p>
+              ) : (
+                <div className="space-y-2">
+                  {google.calendar.map((ev) => (
+                    <div key={ev.id} className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                      <div className="mt-0.5 shrink-0 text-center">
+                        <div className="text-xs font-semibold tabular-nums text-indigo-400">
+                          {formatEventTime(ev.start, ev.allDay)}
+                        </div>
+                        {!ev.allDay && ev.end && (
+                          <div className="text-[10px] text-slate-600">
+                            {formatEventTime(ev.end, false)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-white">{ev.summary}</div>
+                        {ev.location && (
+                          <div className="mt-0.5 truncate text-xs text-slate-500">{ev.location}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Emails requiring attention */}
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Needs Attention
+              </p>
+              {googleLoading ? (
+                <div className="flex items-center gap-2 text-slate-600 text-sm">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+                  Loading…
+                </div>
+              ) : !google?.emails ? (
+                <p className="text-sm text-slate-600">Email unavailable.</p>
+              ) : google.emails.length === 0 ? (
+                <p className="text-sm text-slate-600">Inbox zero. 🎉</p>
+              ) : (
+                <div className="space-y-2">
+                  {google.emails.map((em) => {
+                    const badge = categoryBadge(em.labels);
+                    const unread = em.labels?.includes('UNREAD');
+                    return (
+                      <div key={em.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />}
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">
+                            {fromDisplay(em.from)}
+                          </span>
+                          {badge && (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${badge.cls}`}>
+                              {badge.text}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 truncate text-sm text-white">{em.subject}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-600">{em.date}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
