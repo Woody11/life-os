@@ -8,10 +8,14 @@ const TIMEOUT_MS = 10000;
 function runGog(args) {
   return new Promise((resolve, reject) => {
     execFile(GOG_BIN, args, { timeout: TIMEOUT_MS, env: process.env }, (err, stdout, stderr) => {
-      if (err) return reject(new Error(stderr || err.message));
+      if (err) {
+        console.error(`[google] gog ${args[0]} failed:`, stderr || err.message);
+        return reject(new Error(stderr || err.message));
+      }
       try {
         resolve(JSON.parse(stdout));
       } catch {
+        console.error(`[google] gog ${args[0]} non-JSON output:`, stdout.slice(0, 200));
         reject(new Error('gog returned non-JSON output'));
       }
     });
@@ -42,6 +46,23 @@ function attentionScore(thread) {
 
   return score;
 }
+
+// GET /api/google/debug — raw gog doctor output for diagnosing auth issues
+router.get('/debug', async (_req, res) => {
+  const { execFile: ef } = require('node:child_process');
+  const checks = await Promise.allSettled([
+    new Promise((ok, fail) => ef(GOG_BIN, ['--version'], { env: process.env }, (e, out, err) => e ? fail(err||e.message) : ok(out.trim()))),
+    new Promise((ok, fail) => ef(GOG_BIN, ['auth', 'doctor', '--check', '--no-input'], { env: process.env, timeout: 10000 }, (e, out, err) => ok({ exit: e?.code, stdout: out, stderr: err }))),
+  ]);
+  res.json({
+    gog_bin: GOG_BIN,
+    gog_home: process.env.GOG_HOME,
+    keyring_backend: process.env.GOG_KEYRING_BACKEND,
+    keyring_password_set: !!process.env.GOG_KEYRING_PASSWORD,
+    version: checks[0].status === 'fulfilled' ? checks[0].value : checks[0].reason,
+    doctor: checks[1].status === 'fulfilled' ? checks[1].value : checks[1].reason,
+  });
+});
 
 // GET /api/google — returns today's calendar events + top 5 attention emails
 router.get('/', async (_req, res) => {
