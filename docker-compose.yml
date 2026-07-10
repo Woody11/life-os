@@ -6,10 +6,5 @@ services:
     network_mode: host
     volumes:
       - /mnt/user/appdata/life-os/data:/data
-      - /mnt/user/appdata/gogcli:/gogcli-home:ro
-    environment:
-      - GOG_HOME=/gogcli-home
-      - GOG_KEYRING_BACKEND=file
-      - GOG_KEYRING_PASSWORD=[REDACTED_KEYRING_PASSWORD]
     env_file:
       - .env

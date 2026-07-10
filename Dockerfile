@@ -5,15 +5,7 @@ WORKDIR /app
 # better-sqlite3 ships prebuilt binaries for most targets, but on alpine (musl)
 # npm may need to compile from source. Install the build toolchain so `npm ci`
 # never fails on a fresh image; these are cheap and stay in the final layer.
-RUN apk add --no-cache python3 make g++ wget
-
-# Install gog CLI for Google Workspace (Calendar + Gmail) integration.
-# Go binaries are statically linked so the alpine/musl difference doesn't matter.
-RUN wget -qO /tmp/gogcli.tar.gz \
-    https://github.com/openclaw/gogcli/releases/download/v0.33.0/gogcli_0.33.0_linux_amd64.tar.gz \
-    && tar -xzf /tmp/gogcli.tar.gz -C /usr/local/bin gog \
-    && chmod +x /usr/local/bin/gog \
-    && rm /tmp/gogcli.tar.gz
+RUN apk add --no-cache python3 make g++
 
 # Copy package manifests first and install so Docker can cache the dependency
 # layer independently of source changes.

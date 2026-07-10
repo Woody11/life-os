@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS obsidian_sync_queue (
   next_attempt_at TEXT
 );
 
+-- Google data cache (pushed from OpenClaw heartbeat via POST /api/google/cache)
+CREATE TABLE IF NOT EXISTS google_cache (
+  key        TEXT PRIMARY KEY,
+  data       TEXT NOT NULL,
+  cached_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Indexes for frequent query patterns
 CREATE INDEX IF NOT EXISTS idx_dispatches_status     ON dispatches(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_kanban_cards_domain   ON kanban_cards(domain, updated_at);
