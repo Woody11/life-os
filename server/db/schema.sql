@@ -62,7 +62,49 @@ CREATE TABLE IF NOT EXISTS google_cache (
   cached_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Habits
+CREATE TABLE IF NOT EXISTS habits (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,
+  emoji      TEXT,
+  frequency  TEXT    NOT NULL DEFAULT 'daily',
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS habit_completions (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  habit_id       INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+  completed_date TEXT    NOT NULL,
+  created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(habit_id, completed_date)
+);
+
+-- Goals
+CREATE TABLE IF NOT EXISTS goals (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  title       TEXT    NOT NULL,
+  description TEXT,
+  domain      TEXT    NOT NULL CHECK(domain IN ('SMSF','MBS','Personal','Dev')),
+  target_date TEXT,
+  progress    INTEGER NOT NULL DEFAULT 0 CHECK(progress BETWEEN 0 AND 100),
+  status      TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','paused')),
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS goal_agents (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  goal_id         INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  agent_name      TEXT    NOT NULL,
+  prompt_template TEXT    NOT NULL,
+  button_label    TEXT    NOT NULL,
+  sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
 -- Indexes for frequent query patterns
-CREATE INDEX IF NOT EXISTS idx_dispatches_status     ON dispatches(status, created_at);
-CREATE INDEX IF NOT EXISTS idx_kanban_cards_domain   ON kanban_cards(domain, updated_at);
-CREATE INDEX IF NOT EXISTS idx_sync_queue_next       ON obsidian_sync_queue(attempts, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_dispatches_status          ON dispatches(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_kanban_cards_domain        ON kanban_cards(domain, updated_at);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_next            ON obsidian_sync_queue(attempts, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_habit_completions_hab_date ON habit_completions(habit_id, completed_date);
+CREATE INDEX IF NOT EXISTS idx_goals_status               ON goals(status, updated_at);

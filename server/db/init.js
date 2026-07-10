@@ -39,6 +39,12 @@ function initDb() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
 
+  // Additive column migrations — idempotent via PRAGMA table_info check.
+  const dispatchCols = new Set(db.pragma('table_info(dispatches)').map((c) => c.name));
+  if (!dispatchCols.has('input_tokens'))  db.prepare('ALTER TABLE dispatches ADD COLUMN input_tokens  INTEGER').run();
+  if (!dispatchCols.has('output_tokens')) db.prepare('ALTER TABLE dispatches ADD COLUMN output_tokens INTEGER').run();
+  if (!dispatchCols.has('cost_aud'))      db.prepare('ALTER TABLE dispatches ADD COLUMN cost_aud      REAL').run();
+
   return db;
 }
 

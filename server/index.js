@@ -14,6 +14,9 @@ const mbsRouter = require('./routes/mbs');
 const dispatchRouter = require('./routes/dispatch');
 const kanbanRouter  = require('./routes/kanban');
 const googleRouter  = require('./routes/google');
+const weatherRouter = require('./routes/weather');
+const habitsRouter  = require('./routes/habits');
+const goalsRouter   = require('./routes/goals');
 const { startObsidianSync } = require('./sync/obsidian');
 
 const PORT = process.env.PORT || 3030;
@@ -35,6 +38,9 @@ app.use('/api/mbs', mbsRouter);
 app.use('/api/dispatch', dispatchRouter);
 app.use('/api/kanban',  kanbanRouter);
 app.use('/api/google',  googleRouter);
+app.use('/api/weather', weatherRouter);
+app.use('/api/habits',  habitsRouter);
+app.use('/api/goals',   goalsRouter);
 
 // Serve the built frontend. In production the client is compiled to
 // client/dist by Vite and copied into the image; Express serves it as static

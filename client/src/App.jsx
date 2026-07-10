@@ -4,13 +4,17 @@ import SmsfTab     from './tabs/SmsfTab.jsx';
 import MbsTab      from './tabs/MbsTab.jsx';
 import DispatchTab from './tabs/DispatchTab.jsx';
 import KanbanTab   from './tabs/KanbanTab.jsx';
+import HabitsTab   from './tabs/HabitsTab.jsx';
+import GoalsTab    from './tabs/GoalsTab.jsx';
 
 const TABS = [
-  { to: '/',        label: 'Home',     end: true },
-  { to: '/smsf',    label: 'SMSF' },
-  { to: '/mbs',     label: 'MBS' },
+  { to: '/',         label: 'Home',     end: true },
+  { to: '/smsf',     label: 'SMSF' },
+  { to: '/mbs',      label: 'MBS' },
   { to: '/dispatch', label: 'Dispatch' },
-  { to: '/kanban',  label: 'Kanban' },
+  { to: '/kanban',   label: 'Kanban' },
+  { to: '/habits',   label: 'Habits' },
+  { to: '/goals',    label: 'Goals' },
 ];
 
 function NavBar() {
@@ -69,6 +73,8 @@ export default function App() {
             <Route path="/mbs"     element={<MbsTab />} />
             <Route path="/dispatch" element={<DispatchTab />} />
             <Route path="/kanban"  element={<KanbanTab />} />
+            <Route path="/habits"  element={<HabitsTab />} />
+            <Route path="/goals"   element={<GoalsTab />} />
           </Routes>
         </main>
       </div>

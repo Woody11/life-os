@@ -1,18 +1,9 @@
 const express = require('express');
 const { getDb } = require('../db/init');
+const { dispatchAgent } = require('../lib/dispatchAgent');
 
 const router = express.Router();
 
-function wakeOpenClaw(text) {
-  const url = process.env.OPENCLAW_GATEWAY_URL;
-  const token = process.env.OPENCLAW_HOOK_TOKEN;
-  if (!url || !token) return;
-  fetch(`${url}/hooks/wake`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, mode: 'now' }),
-  }).catch(() => {});
-}
 
 function enqueueVaultSync(db, dispatch) {
   const date = (dispatch.completed_at || dispatch.created_at || '').slice(0, 10);
@@ -95,7 +86,7 @@ router.get('/stats', (_req, res) => {
 
 /** PATCH /api/dispatch/:id — update status + result (called by Bazza after agent completes) */
 router.patch('/:id', (req, res) => {
-  const { status, result, error: errMsg } = req.body ?? {};
+  const { status, result, error: errMsg, input_tokens, output_tokens, cost_aud } = req.body ?? {};
   const allowed = ['running', 'review', 'done', 'error'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}` });
@@ -109,12 +100,15 @@ router.patch('/:id', (req, res) => {
     const closes = status === 'done' || status === 'error';
     db.prepare(
       `UPDATE dispatches
-       SET status = ?,
-           result = ?,
-           error = ?,
-           completed_at = ${closes ? "datetime('now')" : 'completed_at'}
+       SET status        = ?,
+           result        = ?,
+           error         = ?,
+           input_tokens  = COALESCE(?, input_tokens),
+           output_tokens = COALESCE(?, output_tokens),
+           cost_aud      = COALESCE(?, cost_aud),
+           completed_at  = ${closes ? "datetime('now')" : 'completed_at'}
        WHERE id = ?`,
-    ).run(status, result ?? null, errMsg ?? null, req.params.id);
+    ).run(status, result ?? null, errMsg ?? null, input_tokens ?? null, output_tokens ?? null, cost_aud ?? null, req.params.id);
 
     const updated = db.prepare('SELECT * FROM dispatches WHERE id = ?').get(req.params.id);
 
@@ -150,18 +144,8 @@ router.post('/', (req, res) => {
   }
 
   try {
-    const info = getDb()
-      .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
-      .run(agent.trim(), prompt.trim(), 'pending');
-
-    wakeOpenClaw(`New dispatch #${info.lastInsertRowid}: ${agent.trim()} — ${prompt.trim().slice(0, 120)}`);
-
-    res.status(201).json({
-      id: info.lastInsertRowid,
-      dispatch_id: info.lastInsertRowid,
-      status: 'pending',
-      agent: agent.trim(),
-    });
+    const dispatch = dispatchAgent(agent, prompt);
+    res.status(201).json({ ...dispatch, dispatch_id: dispatch.id });
   } catch {
     res.status(500).json({ error: 'Failed to record dispatch' });
   }

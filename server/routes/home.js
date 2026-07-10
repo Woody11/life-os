@@ -2,6 +2,7 @@ const express = require('express');
 const { getDb } = require('../db/init');
 const { USD_TO_AUD } = require('../config');
 const { gatherPrices } = require('../lib/yahoo');
+const { todayAdelaide, adelaideDayBounds } = require('../lib/adelaideTime');
 
 const router = express.Router();
 
@@ -151,17 +152,30 @@ router.get('/', async (_req, res) => {
     partial = true;
   }
 
-  // Local DB read is synchronous (better-sqlite3). A DB failure here shouldn't
-  // 500 the dashboard either — degrade the count to null and mark partial.
+  // Local DB reads are synchronous (better-sqlite3). Failures here degrade
+  // individual slices to null rather than 500-ing the whole response.
   let agent_tasks_today = 0;
+  let spend_today = null;
   try {
-    const row = getDb()
+    const { start, end } = adelaideDayBounds(todayAdelaide());
+    const db = getDb();
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as count FROM dispatches WHERE status = 'done' AND completed_at >= ? AND completed_at < ?`)
+      .get(start, end);
+    agent_tasks_today = countRow?.count ?? 0;
+
+    const spendRow = db
       .prepare(
-        `SELECT COUNT(*) as count FROM dispatches
-         WHERE status = 'done' AND date(completed_at) = date('now')`,
+        `SELECT
+           COUNT(*) as completed_count,
+           COALESCE(SUM(input_tokens),  0) as total_input_tokens,
+           COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+           COALESCE(SUM(cost_aud),      0) as total_cost_aud
+         FROM dispatches
+         WHERE status = 'done' AND completed_at >= ? AND completed_at < ?`,
       )
-      .get();
-    agent_tasks_today = row?.count ?? 0;
+      .get(start, end);
+    spend_today = spendRow ?? null;
   } catch {
     agent_tasks_today = null;
     partial = true;
@@ -170,6 +184,7 @@ router.get('/', async (_req, res) => {
   res.json({
     portfolio,
     agent_tasks_today,
+    spend_today,
     mbs_focus,
     last_updated: new Date().toISOString(),
     partial,

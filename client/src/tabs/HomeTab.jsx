@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import WeatherCard from '../components/WeatherCard.jsx';
+import MorningBriefCard from '../components/MorningBriefCard.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -185,10 +187,21 @@ export default function HomeTab() {
   const timeStr   = clock.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const dateStr   = clock.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const portfolio = data?.portfolio ?? null;
-  const mbs       = data?.mbs_focus ?? null;
-  const tasks     = data?.agent_tasks_today;
-  const costBasis = portfolio ? formatAud(portfolio.total_cost_basis_aud) : null;
+  const portfolio  = data?.portfolio ?? null;
+  const mbs        = data?.mbs_focus ?? null;
+  const tasks      = data?.agent_tasks_today;
+  const spendToday = data?.spend_today ?? null;
+  const costBasis  = portfolio ? formatAud(portfolio.total_cost_basis_aud) : null;
+
+  const spendAud = spendToday?.total_cost_aud > 0
+    ? new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(spendToday.total_cost_aud)
+    : null;
+  const totalTokens = (spendToday?.total_input_tokens ?? 0) + (spendToday?.total_output_tokens ?? 0);
+  const tokenStr = totalTokens >= 1_000_000
+    ? `${(totalTokens / 1_000_000).toFixed(1)}M`
+    : totalTokens >= 1000
+    ? `${(totalTokens / 1000).toFixed(1)}k`
+    : String(totalTokens);
 
   // Live overlay: prefer market value as the headline when prices are available.
   const marketValue = portfolio ? formatAud(portfolio.total_market_value_aud) : null;
@@ -229,6 +242,9 @@ export default function HomeTab() {
         </div>
       </div>
 
+      {/* Morning brief */}
+      <MorningBriefCard />
+
       {/* Partial data warning */}
       {data?.partial && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
@@ -249,7 +265,7 @@ export default function HomeTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Portfolio */}
             <StatCard
               label="SMSF Portfolio"
@@ -268,11 +284,14 @@ export default function HomeTab() {
               )}
             </StatCard>
 
-            {/* Agent tasks */}
+            {/* Weather */}
+            <WeatherCard />
+
+            {/* Agent tasks + AI spend */}
             <StatCard
               label="Agent Tasks Today"
               value={tasks ?? <span className="text-slate-600">—</span>}
-              sub="dispatches completed"
+              sub={spendAud ? `${spendAud} · ${tokenStr} tokens` : 'dispatches completed'}
             />
 
             {/* MBS focus */}
@@ -303,6 +322,8 @@ export default function HomeTab() {
                 { to: '/mbs',      label: 'MBS',       icon: '🎬' },
                 { to: '/dispatch', label: 'Dispatch',  icon: '🤖' },
                 { to: '/kanban',   label: 'Kanban',    icon: '📋' },
+                { to: '/habits',   label: 'Habits',    icon: '✅' },
+                { to: '/goals',    label: 'Goals',     icon: '🎯' },
               ].map((n) => (
                 <button
                   key={n.to}
