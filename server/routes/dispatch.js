@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb } = require('../db/init');
 const { dispatchAgent } = require('../lib/dispatchAgent');
+const { emit } = require('../lib/sseEmitter');
 
 const router = express.Router();
 
@@ -29,6 +30,54 @@ const AGENTS = [
 /** GET /api/dispatch/agents */
 router.get('/agents', (_req, res) => {
   res.json({ agents: AGENTS });
+});
+
+/** GET /api/dispatch/models — curated list of models available for dispatch */
+router.get('/models', (_req, res) => {
+  res.json({ models: [
+    { id: '', label: 'Default (system)' },
+    { id: 'xai/grok-4.5', label: 'Grok 4.5' },
+    { id: 'xai/grok-4.3', label: 'Grok 4.3' },
+    { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+    { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+    { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+    { id: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8' },
+    { id: 'anthropic/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+    { id: 'xai/grok-4.20-beta-latest-reasoning', label: 'Grok 4.20 Reasoning' },
+  ]});
+});
+
+/** GET /api/dispatch/agent-models — per-agent default model config */
+router.get('/agent-models', (_req, res) => {
+  try {
+    const rows = getDb().prepare('SELECT * FROM agent_models').all();
+    res.json({ agentModels: rows });
+  } catch {
+    res.status(500).json({ error: 'Failed to load agent models' });
+  }
+});
+
+/** PUT /api/dispatch/agent-models/:agentName — upsert default model for an agent */
+router.put('/agent-models/:agentName', (req, res) => {
+  const { model } = req.body ?? {};
+  if (typeof model !== 'string' || !model.trim()) {
+    return res.status(400).json({ error: 'model is required' });
+  }
+
+  try {
+    const db = getDb();
+    db.prepare(
+      `INSERT INTO agent_models (agent_name, model, updated_at)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(agent_name) DO UPDATE SET model = excluded.model, updated_at = datetime('now')`,
+    ).run(req.params.agentName, model.trim());
+
+    const row = db.prepare('SELECT * FROM agent_models WHERE agent_name = ?').get(req.params.agentName);
+    res.json(row);
+  } catch {
+    res.status(500).json({ error: 'Failed to update agent model' });
+  }
 });
 
 /** GET /api/dispatch/pending — oldest pending dispatches for Bazza to pick up and run */
@@ -116,6 +165,8 @@ router.patch('/:id', (req, res) => {
       enqueueVaultSync(db, updated);
     }
 
+    emit('dispatch_updated', { id: Number(req.params.id), status, agent: updated.agent });
+
     res.json(updated);
   } catch {
     res.status(500).json({ error: 'Failed to update dispatch' });
@@ -137,14 +188,14 @@ router.get('/:id', (req, res) => {
 
 /** POST /api/dispatch — record a new dispatch */
 router.post('/', (req, res) => {
-  const { agent, prompt } = req.body ?? {};
+  const { agent, prompt, model } = req.body ?? {};
 
   if (typeof agent !== 'string' || !agent.trim() || typeof prompt !== 'string' || !prompt.trim()) {
     return res.status(400).json({ error: 'agent and prompt are required' });
   }
 
   try {
-    const dispatch = dispatchAgent(agent, prompt);
+    const dispatch = dispatchAgent(agent, prompt, model);
     res.status(201).json({ ...dispatch, dispatch_id: dispatch.id });
   } catch {
     res.status(500).json({ error: 'Failed to record dispatch' });

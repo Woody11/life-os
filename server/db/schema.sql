@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS dispatches (
   session_id  TEXT,
   result      TEXT,
   error       TEXT,
+  model       TEXT,
   obsidian_synced INTEGER DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   completed_at TEXT
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS kanban_cards (
   title       TEXT NOT NULL,
   description TEXT,
   stage       TEXT NOT NULL,
+  notes       TEXT,
   agent_pending INTEGER DEFAULT 0,
   obsidian_synced INTEGER DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -100,6 +102,13 @@ CREATE TABLE IF NOT EXISTS goal_agents (
   prompt_template TEXT    NOT NULL,
   button_label    TEXT    NOT NULL,
   sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
+-- Per-agent default model config
+CREATE TABLE IF NOT EXISTS agent_models (
+  agent_name  TEXT PRIMARY KEY,
+  model       TEXT NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Indexes for frequent query patterns

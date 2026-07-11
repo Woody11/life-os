@@ -12,16 +12,17 @@ function wakeOpenClaw(text) {
 }
 
 // Insert a pending dispatch and wake Bazza. Returns the new dispatch row.
-function dispatchAgent(agent, prompt) {
+function dispatchAgent(agent, prompt, model) {
   const info = getDb()
-    .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
-    .run(agent.trim(), prompt.trim(), 'pending');
+    .prepare('INSERT INTO dispatches (agent, prompt, status, model) VALUES (?, ?, ?, ?)')
+    .run(agent.trim(), prompt.trim(), 'pending', model?.trim() || null);
   wakeOpenClaw(`New dispatch #${info.lastInsertRowid}: ${agent} — ${prompt.slice(0, 120)}`);
   return {
     id:     info.lastInsertRowid,
     agent:  agent.trim(),
     prompt: prompt.trim(),
     status: 'pending',
+    model:  model?.trim() || null,
   };
 }
 

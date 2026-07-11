@@ -7,6 +7,7 @@ require('dotenv').config();
 const path = require('node:path');
 const express = require('express');
 const { initDb } = require('./db/init');
+const { addClient, removeClient } = require('./lib/sseEmitter');
 const statusRouter = require('./routes/status');
 const homeRouter = require('./routes/home');
 const smsfRouter = require('./routes/smsf');
@@ -29,6 +30,21 @@ initDb();
 const app = express();
 app.use(express.json());
 
+// SSE stream — registered before the static handler (and before other API
+// routes, since it needs to set streaming headers itself rather than go
+// through JSON body handling).
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  addClient(res);
+  // Heartbeat comment every 30s to keep intermediary proxies from closing the
+  // connection during quiet periods.
+  const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch { clearInterval(hb); } }, 30_000);
+  req.on('close', () => { removeClient(res); clearInterval(hb); });
+});
+
 // API routes are mounted before the static handler so /api/* is never shadowed
 // by the SPA fallback below.
 app.use('/api/status', statusRouter);
@@ -41,6 +57,7 @@ app.use('/api/google',  googleRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/habits',  habitsRouter);
 app.use('/api/goals',   goalsRouter);
+app.use('/api/search',  require('./routes/search'));
 
 // Serve the built frontend. In production the client is compiled to
 // client/dist by Vite and copied into the image; Express serves it as static

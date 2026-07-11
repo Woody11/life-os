@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb } = require('../db/init');
 const { asyncHandler } = require('../lib/asyncHandler');
+const { emit } = require('../lib/sseEmitter');
 
 const router = express.Router();
 
@@ -67,6 +68,32 @@ router.post('/', asyncHandler((req, res) => {
   }
 }));
 
+/** PATCH /api/kanban/:id — update editable card fields (title, description, notes) */
+router.patch('/:id', asyncHandler((req, res) => {
+  const { title, description, notes } = req.body ?? {};
+  const db = getDb();
+
+  const card = db.prepare('SELECT * FROM kanban_cards WHERE id = ?').get(req.params.id);
+  if (!card) return res.status(404).json({ error: 'Card not found' });
+
+  try {
+    db.prepare(
+      `UPDATE kanban_cards
+       SET title       = COALESCE(?, title),
+           description = COALESCE(?, description),
+           notes       = COALESCE(?, notes),
+           updated_at  = datetime('now')
+       WHERE id = ?`,
+    ).run(title?.trim() ?? null, description?.trim() ?? null, notes?.trim() ?? null, card.id);
+
+    const updated = db.prepare('SELECT * FROM kanban_cards WHERE id = ?').get(card.id);
+    queueObsidianSync(db, 'kanban_card', card.id, updated);
+    res.json({ card: updated });
+  } catch {
+    res.status(500).json({ error: 'Failed to update card' });
+  }
+}));
+
 /** PATCH /api/kanban/:id/stage — move card to a new stage, record dispatch if agent assigned */
 router.patch('/:id/stage', asyncHandler((req, res) => {
   const { stage } = req.body ?? {};
@@ -117,6 +144,7 @@ router.patch('/:id/stage', asyncHandler((req, res) => {
     })();
 
     queueObsidianSync(db, 'kanban_card', card.id, updated);
+    emit('kanban_updated', { id: card.id, stage });
     res.json({ card: updated, dispatch_id: dispatchId, agent: agentName });
   } catch {
     res.status(500).json({ error: 'Failed to move card' });

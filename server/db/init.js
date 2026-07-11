@@ -44,11 +44,15 @@ function initDb() {
   if (!dispatchCols.has('input_tokens'))  db.prepare('ALTER TABLE dispatches ADD COLUMN input_tokens  INTEGER').run();
   if (!dispatchCols.has('output_tokens')) db.prepare('ALTER TABLE dispatches ADD COLUMN output_tokens INTEGER').run();
   if (!dispatchCols.has('cost_aud'))      db.prepare('ALTER TABLE dispatches ADD COLUMN cost_aud      REAL').run();
+  if (!dispatchCols.has('model'))         db.prepare('ALTER TABLE dispatches ADD COLUMN model         TEXT').run();
 
   const syncQueueCols = new Set(db.pragma('table_info(obsidian_sync_queue)').map((c) => c.name));
   if (!syncQueueCols.has('status')) {
     db.prepare("ALTER TABLE obsidian_sync_queue ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'").run();
   }
+
+  const kanbanCols = new Set(db.pragma('table_info(kanban_cards)').map((c) => c.name));
+  if (!kanbanCols.has('notes')) db.prepare('ALTER TABLE kanban_cards ADD COLUMN notes TEXT').run();
 
   return db;
 }
