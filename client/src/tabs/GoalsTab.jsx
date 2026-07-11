@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import Toast from '../components/Toast.jsx';
 
 const DOMAIN_COLORS = {
   SMSF:     'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
@@ -12,23 +13,25 @@ const DOMAINS = ['SMSF', 'MBS', 'Personal', 'Dev'];
 const STATUSES = ['active', 'completed', 'paused'];
 
 function ProgressBar({ value, onChange }) {
-  const timer = useRef(null);
+  const [localValue, setLocalValue] = useState(value);
 
-  function handleChange(e) {
-    const v = Number(e.target.value);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => onChange(v), 400);
+  useEffect(() => { setLocalValue(value); }, [value]);
+
+  function commit(e) {
+    onChange(Number(e.target.value));
   }
 
   return (
     <div className="mt-3">
       <div className="mb-1 flex justify-between text-xs text-slate-500">
         <span>Progress</span>
-        <span>{value}%</span>
+        <span>{localValue}%</span>
       </div>
       <input
-        type="range" min={0} max={100} defaultValue={value}
-        onChange={handleChange}
+        type="range" min={0} max={100} value={localValue}
+        onChange={(e) => setLocalValue(Number(e.target.value))}
+        onMouseUp={commit}
+        onTouchEnd={commit}
         className="w-full accent-indigo-500"
       />
     </div>
@@ -69,10 +72,9 @@ function AgentDispatchButton({ goalId, agentRow, onDispatched }) {
   );
 }
 
-function GoalCard({ goal, onUpdate, onDelete }) {
+function GoalCard({ goal, onUpdate, onDelete, onToast }) {
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ agent_name: AGENTS[0], prompt_template: '', button_label: '' });
-  const [toast, setToast] = useState(null);
 
   async function patchProgress(progress) {
     const res = await fetch(`/api/goals/${goal.id}`, {
@@ -114,8 +116,12 @@ function GoalCard({ goal, onUpdate, onDelete }) {
   }
 
   function handleDispatched(agentName) {
-    setToast(`Dispatched to ${agentName}`);
-    setTimeout(() => setToast(null), 3000);
+    onToast(`Dispatched to ${agentName}`);
+  }
+
+  function handleDelete() {
+    if (!confirm('Delete this goal?')) return;
+    onDelete(goal.id);
   }
 
   const domainCls = DOMAIN_COLORS[goal.domain] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
@@ -148,7 +154,7 @@ function GoalCard({ goal, onUpdate, onDelete }) {
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <button
-            onClick={() => onDelete(goal.id)}
+            onClick={handleDelete}
             className="text-slate-700 hover:text-red-400 transition-colors text-xs"
           >
             ✕
@@ -168,10 +174,6 @@ function GoalCard({ goal, onUpdate, onDelete }) {
             </div>
           ))}
         </div>
-      )}
-
-      {toast && (
-        <div className="mt-3 text-xs text-emerald-400">{toast}</div>
       )}
 
       {showAddAgent ? (
@@ -295,6 +297,7 @@ export default function GoalsTab() {
   const [goals, setGoals]   = useState([]);
   const [filter, setFilter] = useState('active');
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     fetch('/api/goals')
@@ -351,10 +354,12 @@ export default function GoalsTab() {
       ) : (
         <div className="space-y-3">
           {filtered.map((g) => (
-            <GoalCard key={g.id} goal={g} onUpdate={handleUpdate} onDelete={handleDelete} />
+            <GoalCard key={g.id} goal={g} onUpdate={handleUpdate} onDelete={handleDelete} onToast={setToast} />
           ))}
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

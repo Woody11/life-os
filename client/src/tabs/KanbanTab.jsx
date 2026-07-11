@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import Toast from '../components/Toast.jsx';
 
 // ---------------------------------------------------------------------------
 // Shared UI atoms
@@ -226,7 +227,7 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
 // Single Kanban board (one domain)
 // ---------------------------------------------------------------------------
 
-function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCard }) {
+function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCard, onDeleteCard }) {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -264,6 +265,7 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
                     pipeline={pipeline}
                     onClick={() => onCardClick(card)}
                     onMove={(targetStage) => onMoveCard(card, targetStage)}
+                    onDelete={onDeleteCard}
                   />
                 ))}
                 {stageCards.length === 0 && (
@@ -282,14 +284,14 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
 // Individual card tile
 // ---------------------------------------------------------------------------
 
-function KanbanCardTile({ card, pipeline, onClick, onMove }) {
+function KanbanCardTile({ card, pipeline, onClick, onMove, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const currentIdx = pipeline.stages.indexOf(card.stage);
   const canMoveBack = currentIdx > 0;
   const canMoveFwd  = currentIdx < pipeline.stages.length - 1;
 
   return (
-    <div className="relative rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 shadow-sm transition-colors hover:border-white/10 hover:bg-white/[0.06]">
+    <div className="group relative rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 shadow-sm transition-colors hover:border-white/10 hover:bg-white/[0.06]">
       {card.agent_pending === 1 && (
         <span
           className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-indigo-400"
@@ -297,12 +299,24 @@ function KanbanCardTile({ card, pipeline, onClick, onMove }) {
         />
       )}
 
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
+        className="absolute right-1 top-0.5 hidden h-4 w-4 items-center justify-center rounded text-xs leading-none text-slate-500 opacity-0 transition-opacity hover:bg-white/[0.08] hover:text-red-400 group-hover:flex group-hover:opacity-100"
+        title="Delete card"
+      >
+        ×
+      </button>
+
       <p
         className="cursor-pointer pr-3 text-xs font-medium text-slate-100 transition-colors hover:text-white"
         onClick={onClick}
       >
         {card.title}
       </p>
+
+      {card.priority > 0 && (
+        <span className="mt-1 inline-block text-xs text-amber-400">P{card.priority}</span>
+      )}
 
       <div className="mt-2 flex items-center gap-1">
         {canMoveBack && (
@@ -367,6 +381,7 @@ export default function KanbanTab() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [addDomain, setAddDomain]           = useState(null);
   const [detailCard, setDetailCard]         = useState(null);
+  const [toast, setToast]                   = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -407,8 +422,8 @@ export default function KanbanTab() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setCards((prev) => prev.map((c) => (c.id === card.id ? json.card : c)));
-    } catch (err) {
-      alert(`Move failed: ${err.message}`);
+    } catch {
+      setToast('Failed — please try again');
     }
   }
 
@@ -425,8 +440,8 @@ export default function KanbanTab() {
       const json = await res.json();
       setCards((prev) => prev.map((c) => (c.id === card.id ? json.card : c)));
       setConfirmPending(null);
-    } catch (err) {
-      alert(`Move failed: ${err.message}`);
+    } catch {
+      setToast('Failed — please try again');
     } finally {
       setConfirmLoading(false);
     }
@@ -444,7 +459,7 @@ export default function KanbanTab() {
       setCards((prev) => prev.filter((c) => c.id !== cardId));
       setDetailCard(null);
     } catch {
-      alert('Delete failed');
+      setToast('Failed — please try again');
     }
   }
 
@@ -491,10 +506,13 @@ export default function KanbanTab() {
               onMoveCard={handleMoveRequest}
               onCardClick={setDetailCard}
               onAddCard={setAddDomain}
+              onDeleteCard={handleDelete}
             />
           </div>
         ))}
       </div>
+
+      <Toast message={toast} onClose={() => setToast(null)} />
 
       {confirmPending && (
         <ConfirmModal

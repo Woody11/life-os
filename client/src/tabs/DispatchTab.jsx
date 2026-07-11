@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Toast from '../components/Toast.jsx';
 
 // ---------------------------------------------------------------------------
 // Status styling
@@ -222,7 +223,7 @@ function LiveFeed({ dispatches }) {
 // New Dispatch slide-in panel
 // ---------------------------------------------------------------------------
 
-function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched }) {
+function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched, onToast }) {
   const [agent, setAgent]           = useState('');
   const [prompt, setPrompt]         = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -250,9 +251,11 @@ function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched })
       setPrompt('');
       setFeedback(null);
       onDispatched?.();
+      onToast?.(`Dispatched to ${agent}`);
       onClose();
     } catch (err) {
       setFeedback({ type: 'error', text: `Dispatch failed: ${err.message}` });
+      onToast?.('Send failed — please try again');
     } finally {
       setSubmitting(false);
     }
@@ -435,6 +438,7 @@ export default function DispatchTab() {
   const [panelOpen, setPanelOpen]     = useState(false);
   const [pickedAgent, setPickedAgent] = useState('');
   const [detail, setDetail]           = useState(null);
+  const [toast, setToast]             = useState(null);
 
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString());
   const intervalRef = useRef(null);
@@ -556,9 +560,12 @@ export default function DispatchTab() {
         initialAgent={pickedAgent}
         onClose={() => setPanelOpen(false)}
         onDispatched={() => load(new AbortController().signal)}
+        onToast={setToast}
       />
 
       <DetailPanel dispatch={detail} onClose={() => setDetail(null)} />
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

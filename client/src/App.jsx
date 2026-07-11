@@ -30,31 +30,33 @@ function NavBar() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-1 gap-1">
-          {TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                [
-                  'relative px-4 py-3.5 text-sm font-medium transition-colors duration-150',
-                  isActive
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200',
-                ].join(' ')
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {t.label}
-                  {isActive && (
-                    <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-1 min-w-max">
+            {TABS.map((t) => (
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.end}
+                className={({ isActive }) =>
+                  [
+                    'relative px-4 py-3.5 text-sm font-medium transition-colors duration-150',
+                    isActive
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200',
+                  ].join(' ')
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {t.label}
+                    {isActive && (
+                      <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         </div>
       </div>
     </nav>

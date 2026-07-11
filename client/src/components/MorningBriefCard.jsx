@@ -19,7 +19,11 @@ export default function MorningBriefCard() {
   useEffect(() => {
     fetch('/api/google/cache/morning_brief')
       .then((r) => r.ok ? r.json() : null)
-      .then((res) => setBrief(res?.data ?? null))
+      .then((res) => {
+        const data = res?.data ?? null;
+        setBrief(data);
+        setOpen(isToday(data?.generated_at));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

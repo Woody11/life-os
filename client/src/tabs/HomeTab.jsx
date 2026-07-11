@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
@@ -134,22 +134,20 @@ export default function HomeTab() {
   const [google, setGoogle]       = useState(null);
   const [googleLoading, setGoogleLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res  = await fetch('/api/home');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } catch (err) {
-        if (!cancelled) setError(err.message || 'Failed to load');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const loadHome = useCallback(() => {
+    setError(null);
+    return fetch('/api/home')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((json) => setData(json))
+      .catch((err) => setError(err.message || 'Failed to load'))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadHome();
+    const t = setInterval(loadHome, 60_000);
+    return () => clearInterval(t);
+  }, [loadHome]);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,8 +258,14 @@ export default function HomeTab() {
           <span className="text-sm">Loading…</span>
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
-          Failed to load: {error}
+        <div className="flex flex-col items-center gap-3 py-12 text-center">
+          <p className="text-rose-400">Failed to load: {error}</p>
+          <button
+            onClick={() => { setLoading(true); loadHome(); }}
+            className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <>
@@ -313,27 +317,34 @@ export default function HomeTab() {
             </div>
           </div>
 
-          {/* ── Quick nav ── */}
+          {/* ── Quick actions ── */}
           <div className="mt-8">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Quick nav</p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Quick Actions</p>
             <div className="flex flex-wrap gap-2">
-              {[
-                { to: '/smsf',     label: 'SMSF',     icon: '📈' },
-                { to: '/mbs',      label: 'MBS',       icon: '🎬' },
-                { to: '/dispatch', label: 'Dispatch',  icon: '🤖' },
-                { to: '/kanban',   label: 'Kanban',    icon: '📋' },
-                { to: '/habits',   label: 'Habits',    icon: '✅' },
-                { to: '/goals',    label: 'Goals',     icon: '🎯' },
-              ].map((n) => (
-                <button
-                  key={n.to}
-                  onClick={() => navigate(n.to)}
-                  className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.04] px-4 py-2 text-sm text-slate-300 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-white"
-                >
-                  <span>{n.icon}</span>
-                  {n.label}
-                </button>
-              ))}
+              <button
+                onClick={() => navigate('/habits')}
+                className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-sm text-emerald-400 transition-colors hover:bg-emerald-500/10"
+              >
+                + Log Habit
+              </button>
+              <button
+                onClick={() => navigate('/goals')}
+                className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-2 text-sm text-indigo-400 transition-colors hover:bg-indigo-500/10"
+              >
+                + New Goal
+              </button>
+              <button
+                onClick={() => navigate('/dispatch')}
+                className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-4 py-2 text-sm text-violet-400 transition-colors hover:bg-violet-500/10"
+              >
+                Dispatch Agent
+              </button>
+              <button
+                onClick={() => navigate('/kanban')}
+                className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-sm text-amber-400 transition-colors hover:bg-amber-500/10"
+              >
+                View Board
+              </button>
             </div>
           </div>
 

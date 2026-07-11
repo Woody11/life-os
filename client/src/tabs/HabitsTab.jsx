@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import Toast from '../components/Toast.jsx';
 
-function HabitCard({ habit, onToggle, onArchive }) {
+function HabitCard({ habit, onToggle, onArchive, onToast }) {
   const [toggling, setToggling] = useState(false);
 
   async function toggle() {
@@ -8,6 +9,9 @@ function HabitCard({ habit, onToggle, onArchive }) {
     try {
       const res = await fetch(`/api/habits/${habit.id}/toggle`, { method: 'POST' });
       if (res.ok) onToggle(await res.json());
+      else onToast('Action failed — please try again');
+    } catch {
+      onToast('Action failed — please try again');
     } finally {
       setToggling(false);
     }
@@ -68,7 +72,7 @@ function HabitCard({ habit, onToggle, onArchive }) {
   );
 }
 
-function AddHabitForm({ onAdd }) {
+function AddHabitForm({ onAdd, onToast }) {
   const [name, setName]   = useState('');
   const [emoji, setEmoji] = useState('');
   const [saving, setSaving] = useState(false);
@@ -87,7 +91,11 @@ function AddHabitForm({ onAdd }) {
         onAdd(await res.json());
         setName('');
         setEmoji('');
+      } else {
+        onToast('Action failed — please try again');
       }
+    } catch {
+      onToast('Action failed — please try again');
     } finally {
       setSaving(false);
     }
@@ -122,12 +130,14 @@ function AddHabitForm({ onAdd }) {
 export default function HabitsTab() {
   const [habits, setHabits]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+  const [toast, setToast]     = useState(null);
 
   useEffect(() => {
     fetch('/api/habits')
       .then((r) => r.json())
       .then((d) => setHabits(d.habits ?? []))
-      .catch(() => {})
+      .catch(() => setError('Failed to load habits'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -140,12 +150,17 @@ export default function HabitsTab() {
   }
 
   async function handleArchive(id) {
-    const res = await fetch(`/api/habits/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: false }),
-    });
-    if (res.ok) setHabits((prev) => prev.filter((h) => h.id !== id));
+    try {
+      const res = await fetch(`/api/habits/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: false }),
+      });
+      if (res.ok) setHabits((prev) => prev.filter((h) => h.id !== id));
+      else setToast('Action failed — please try again');
+    } catch {
+      setToast('Action failed — please try again');
+    }
   }
 
   const completedToday = habits.filter((h) => h.completed_today).length;
@@ -164,7 +179,7 @@ export default function HabitsTab() {
       </div>
 
       <div className="mb-6">
-        <AddHabitForm onAdd={handleAdd} />
+        <AddHabitForm onAdd={handleAdd} onToast={setToast} />
       </div>
 
       {loading ? (
@@ -172,15 +187,19 @@ export default function HabitsTab() {
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
           <span className="text-sm">Loading…</span>
         </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-rose-400">{error}</p>
       ) : habits.length === 0 ? (
         <p className="py-16 text-center text-sm text-slate-600">No habits yet — add one above.</p>
       ) : (
         <div className="space-y-3">
           {habits.map((h) => (
-            <HabitCard key={h.id} habit={h} onToggle={handleToggle} onArchive={handleArchive} />
+            <HabitCard key={h.id} habit={h} onToggle={handleToggle} onArchive={handleArchive} onToast={setToast} />
           ))}
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
