@@ -3,9 +3,42 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-app: #080c14;
+    --bg-surface: #0c1220;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --border-color: rgba(255, 255, 255, 0.05);
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-heading: rgba(255, 255, 255, 0.7);
+    --scrollbar-thumb: #1e2a45;
+    --scrollbar-thumb-hover: #2d3f6b;
+  }
+
+  body.theme-light {
+    --bg-app: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-hover: #f1f5f9;
+    --border-color: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-heading: #334155;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
+  }
+
   html {
     background-color: #080c14;
     color-scheme: dark;
+  }
+
+  body.theme-light {
+    color-scheme: light;
+  }
+
+  body.theme-light,
+  body.theme-light html {
+    background-color: var(--bg-app);
   }
 
   /* Smooth scrollbar in dark theme */
@@ -17,11 +50,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1e2a45;
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #2d3f6b;
+    background: var(--scrollbar-thumb-hover);
   }
 }
 
@@ -31,6 +64,12 @@
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  body.theme-light .glass {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
   /* Indigo glow for accented elements */
