@@ -45,6 +45,11 @@ function initDb() {
   if (!dispatchCols.has('output_tokens')) db.prepare('ALTER TABLE dispatches ADD COLUMN output_tokens INTEGER').run();
   if (!dispatchCols.has('cost_aud'))      db.prepare('ALTER TABLE dispatches ADD COLUMN cost_aud      REAL').run();
 
+  const syncQueueCols = new Set(db.pragma('table_info(obsidian_sync_queue)').map((c) => c.name));
+  if (!syncQueueCols.has('status')) {
+    db.prepare("ALTER TABLE obsidian_sync_queue ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'").run();
+  }
+
   return db;
 }
 

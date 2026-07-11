@@ -1,5 +1,6 @@
 const express = require('express');
 const { getDb } = require('../db/init');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -17,12 +18,12 @@ const PIPELINES = {
 };
 
 /** GET /api/kanban/pipelines — pipeline config for the UI */
-router.get('/pipelines', (_req, res) => {
+router.get('/pipelines', asyncHandler((_req, res) => {
   res.json({ pipelines: PIPELINES });
-});
+}));
 
 /** GET /api/kanban — all cards, optionally filtered by domain */
-router.get('/', (req, res) => {
+router.get('/', asyncHandler((req, res) => {
   try {
     const { domain } = req.query;
     const db = getDb();
@@ -33,10 +34,10 @@ router.get('/', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to load cards' });
   }
-});
+}));
 
 /** POST /api/kanban — create a new card */
-router.post('/', (req, res) => {
+router.post('/', asyncHandler((req, res) => {
   const { domain, title, description } = req.body ?? {};
 
   if (!domain || !PIPELINES[domain]) {
@@ -64,10 +65,10 @@ router.post('/', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to create card' });
   }
-});
+}));
 
 /** PATCH /api/kanban/:id/stage — move card to a new stage, record dispatch if agent assigned */
-router.patch('/:id/stage', (req, res) => {
+router.patch('/:id/stage', asyncHandler((req, res) => {
   const { stage } = req.body ?? {};
   const db = getDb();
 
@@ -76,6 +77,8 @@ router.patch('/:id/stage', (req, res) => {
 
   const pipeline = PIPELINES[card.domain];
   if (!pipeline) return res.status(400).json({ error: 'Unknown domain' });
+  // Stages are domain-specific (mbs vs smsf pipelines differ), so validation
+  // is against this card's own pipeline rather than a single global enum.
   if (!pipeline.stages.includes(stage)) {
     return res.status(400).json({ error: `Invalid stage for ${card.domain}: ${stage}` });
   }
@@ -118,10 +121,10 @@ router.patch('/:id/stage', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to move card' });
   }
-});
+}));
 
 /** DELETE /api/kanban/:id */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', asyncHandler((req, res) => {
   try {
     const info = getDb().prepare('DELETE FROM kanban_cards WHERE id = ?').run(req.params.id);
     if (info.changes === 0) return res.status(404).json({ error: 'Card not found' });
@@ -129,10 +132,10 @@ router.delete('/:id', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to delete card' });
   }
-});
+}));
 
 /** GET /api/kanban/:id/log */
-router.get('/:id/log', (req, res) => {
+router.get('/:id/log', asyncHandler((req, res) => {
   try {
     const rows = getDb()
       .prepare('SELECT * FROM kanban_card_log WHERE card_id = ? ORDER BY created_at DESC')
@@ -141,7 +144,7 @@ router.get('/:id/log', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to load log' });
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers

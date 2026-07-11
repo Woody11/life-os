@@ -6,22 +6,16 @@ const router = express.Router();
 
 // Slightly longer than the Home aggregate timeout: this is a direct passthrough
 // the SMSF tab depends on, so give the upstream a bit more room before failing.
-const FETCH_TIMEOUT_MS = 6000;
+const FETCH_TIMEOUT_MS = 5000;
 
 /**
  * GET JSON from a URL with a hard timeout. Throws on network error / non-2xx /
  * timeout so callers can uniformly degrade to a 502.
  */
 async function fetchJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const upstream = await fetch(url, { signal: controller.signal });
-    if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
-    return await upstream.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
+  return await upstream.json();
 }
 
 /**

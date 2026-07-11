@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb } = require('../db/init');
 const { dispatchAgent } = require('../lib/dispatchAgent');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ function getGoalWithAgents(id) {
 }
 
 // GET /api/goals
-router.get('/', (req, res) => {
+router.get('/', asyncHandler((req, res) => {
   try {
     const db = getDb();
     const { status } = req.query;
@@ -36,10 +37,10 @@ router.get('/', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to load goals' });
   }
-});
+}));
 
 // GET /api/goals/:id
-router.get('/:id', (req, res) => {
+router.get('/:id', asyncHandler((req, res) => {
   try {
     const goal = getGoalWithAgents(req.params.id);
     if (!goal) return res.status(404).json({ error: 'Not found' });
@@ -47,10 +48,10 @@ router.get('/:id', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to load goal' });
   }
-});
+}));
 
 // POST /api/goals
-router.post('/', (req, res) => {
+router.post('/', asyncHandler((req, res) => {
   const { title, description, domain, target_date, status = 'active' } = req.body ?? {};
   if (!title?.trim())            return res.status(400).json({ error: 'title is required' });
   if (!VALID_DOMAINS.includes(domain)) return res.status(400).json({ error: `domain must be one of: ${VALID_DOMAINS.join(', ')}` });
@@ -63,10 +64,10 @@ router.post('/', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to create goal' });
   }
-});
+}));
 
 // PATCH /api/goals/:id
-router.patch('/:id', (req, res) => {
+router.patch('/:id', asyncHandler((req, res) => {
   const db = getDb();
   try {
     const existing = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
@@ -100,22 +101,20 @@ router.patch('/:id', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to update goal' });
   }
-});
+}));
 
 // DELETE /api/goals/:id
-router.delete('/:id', (req, res) => {
-  try {
-    const existing = getDb().prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Not found' });
-    getDb().prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ error: 'Failed to delete goal' });
-  }
-});
+router.delete('/:id', asyncHandler((req, res) => {
+  const db = getDb();
+  const id = Number(req.params.id);
+  const existing = db.prepare('SELECT id FROM goals WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  db.prepare('DELETE FROM goals WHERE id = ?').run(id);
+  res.json({ ok: true });
+}));
 
 // POST /api/goals/:id/agents
-router.post('/:id/agents', (req, res) => {
+router.post('/:id/agents', asyncHandler((req, res) => {
   const { agent_name, prompt_template, button_label, sort_order = 0 } = req.body ?? {};
   if (!agent_name?.trim() || !prompt_template?.trim() || !button_label?.trim()) {
     return res.status(400).json({ error: 'agent_name, prompt_template, and button_label are required' });
@@ -130,10 +129,10 @@ router.post('/:id/agents', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to add agent' });
   }
-});
+}));
 
 // DELETE /api/goals/:id/agents/:agentId
-router.delete('/:id/agents/:agentId', (req, res) => {
+router.delete('/:id/agents/:agentId', asyncHandler((req, res) => {
   try {
     const row = getDb().prepare('SELECT * FROM goal_agents WHERE id = ? AND goal_id = ?').get(req.params.agentId, req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
@@ -142,10 +141,10 @@ router.delete('/:id/agents/:agentId', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to delete agent' });
   }
-});
+}));
 
 // POST /api/goals/:id/dispatch/:agentId
-router.post('/:id/dispatch/:agentId', (req, res) => {
+router.post('/:id/dispatch/:agentId', asyncHandler((req, res) => {
   try {
     const db = getDb();
     const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
@@ -162,6 +161,6 @@ router.post('/:id/dispatch/:agentId', (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to dispatch agent' });
   }
-});
+}));
 
 module.exports = router;

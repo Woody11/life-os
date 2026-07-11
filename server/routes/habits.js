@@ -24,8 +24,9 @@ function buildHabitPayload(habit) {
   const db = getDb();
   const today = todayAdelaide();
 
-  // Last 60 days of completions for streak calculation
-  const since = shiftDate(today, -59);
+  // Last 365 days of completions for streak calculation — a 60-day cutoff
+  // would silently truncate any streak longer than 60 days.
+  const since = shiftDate(today, -364);
   const rows = db
     .prepare('SELECT completed_date FROM habit_completions WHERE habit_id = ? AND completed_date >= ? ORDER BY completed_date DESC')
     .all(habit.id, since);

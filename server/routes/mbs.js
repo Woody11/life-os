@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 // Shared timeout for every upstream Lego Studio call.
-const FETCH_TIMEOUT_MS = 6000;
+const FETCH_TIMEOUT_MS = 5000;
 
 // The canonical pipeline stages, left-to-right. The board renders these in
 // order; any schedule item whose status doesn't match one of these still gets
@@ -22,15 +22,9 @@ const PIPELINE_STAGES = [
  * Throws on non-2xx or network/timeout failure.
  */
 async function fetchJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const upstream = await fetch(url, { signal: controller.signal });
-    if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
-    return await upstream.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`);
+  return await upstream.json();
 }
 
 /**

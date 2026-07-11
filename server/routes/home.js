@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Per-upstream fetch timeout. Kept short so one dead dependency can't stall the
 // aggregated Home response — the tab polls this and must stay responsive.
-const FETCH_TIMEOUT_MS = 4000;
+const FETCH_TIMEOUT_MS = 5000;
 
 /**
  * GET JSON from a URL with a hard timeout. Resolves to the parsed body, or
@@ -16,15 +16,9 @@ const FETCH_TIMEOUT_MS = 4000;
  * relevant slice to null and mark the response partial.
  */
 async function fetchJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
 }
 
 /**
@@ -115,10 +109,12 @@ router.get('/', async (_req, res) => {
 
   // Promise.allSettled so one rejection doesn't reject the whole batch — we
   // want whatever data is available, not all-or-nothing.
-  const [holdingsResult, scheduleResult] = await Promise.all([
-    fetchJson(wcUrl).catch((err) => ({ __error: err })),
-    fetchJson(legoUrl).catch((err) => ({ __error: err })),
+  const [holdingsSettled, scheduleSettled] = await Promise.allSettled([
+    fetchJson(wcUrl),
+    fetchJson(legoUrl),
   ]);
+  const holdingsResult = holdingsSettled.status === 'fulfilled' ? holdingsSettled.value : { __error: holdingsSettled.reason };
+  const scheduleResult = scheduleSettled.status === 'fulfilled' ? scheduleSettled.value : { __error: scheduleSettled.reason };
 
   let partial = false;
 

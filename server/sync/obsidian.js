@@ -140,35 +140,48 @@ function backoffMs(attempts) {
   return BACKOFF_BASE_MS * Math.pow(4, attempts); // 30s, 2m, 8m, 32m
 }
 
-async function processBatch() {
-  const db = getDb();
-  const due = db
-    .prepare(
-      `SELECT * FROM obsidian_sync_queue
-       WHERE attempts < ?
-         AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now'))
-       ORDER BY created_at ASC
-       LIMIT 10`,
-    )
-    .all(MAX_ATTEMPTS);
+// Guards against overlapping runs: a batch of up to 10 items can take longer
+// than SYNC_INTERVAL_MS (each write has a 10s timeout), so without this the
+// interval could fire a second processBatch while the first is still writing.
+let syncRunning = false;
 
-  for (const item of due) {
-    try {
-      const markdown = buildNote(item.entity_type, item.payload);
-      await writeToObsidian(item.vault_path, markdown);
-      // Success — remove from queue
-      db.prepare('DELETE FROM obsidian_sync_queue WHERE id = ?').run(item.id);
-    } catch (err) {
-      const nextAttempts = item.attempts + 1;
-      const nextAt = nextAttempts < MAX_ATTEMPTS
-        ? new Date(Date.now() + backoffMs(nextAttempts)).toISOString().replace('T', ' ').slice(0, 19)
-        : null;
-      db.prepare(
-        `UPDATE obsidian_sync_queue
-         SET attempts = ?, last_error = ?, next_attempt_at = ?
-         WHERE id = ?`,
-      ).run(nextAttempts, err.message ?? String(err), nextAt, item.id);
+async function processBatch() {
+  if (syncRunning) return;
+  syncRunning = true;
+  try {
+    const db = getDb();
+    const due = db
+      .prepare(
+        `SELECT * FROM obsidian_sync_queue
+         WHERE status = 'pending'
+           AND attempts < ?
+           AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now'))
+         ORDER BY created_at ASC
+         LIMIT 10`,
+      )
+      .all(MAX_ATTEMPTS);
+
+    for (const item of due) {
+      try {
+        const markdown = buildNote(item.entity_type, item.payload);
+        await writeToObsidian(item.vault_path, markdown);
+        // Success — remove from queue
+        db.prepare('DELETE FROM obsidian_sync_queue WHERE id = ?').run(item.id);
+      } catch (err) {
+        const nextAttempts = item.attempts + 1;
+        const exhausted = nextAttempts >= MAX_ATTEMPTS;
+        const nextAt = exhausted
+          ? null
+          : new Date(Date.now() + backoffMs(nextAttempts)).toISOString().replace('T', ' ').slice(0, 19);
+        db.prepare(
+          `UPDATE obsidian_sync_queue
+           SET attempts = ?, last_error = ?, next_attempt_at = ?, status = ?
+           WHERE id = ?`,
+        ).run(nextAttempts, err.message ?? String(err), nextAt, exhausted ? 'failed' : 'pending', item.id);
+      }
     }
+  } finally {
+    syncRunning = false;
   }
 }
 

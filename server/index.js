@@ -55,6 +55,14 @@ app.get('/*splat', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
 
+// Global error handler — catches anything routes didn't handle themselves
+// (including async rejections forwarded via asyncHandler) so the process
+// never crashes and the client always gets a JSON response.
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 app.listen(PORT, () => {
   console.log(`[life-os] server listening on port ${PORT}`);
   startObsidianSync();

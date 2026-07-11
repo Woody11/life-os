@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS kanban_card_log (
   card_id     INTEGER NOT NULL REFERENCES kanban_cards(id) ON DELETE CASCADE,
   agent       TEXT NOT NULL,
   note        TEXT NOT NULL,
-  dispatch_id INTEGER REFERENCES dispatches(id),
+  dispatch_id INTEGER REFERENCES dispatches(id) ON DELETE CASCADE,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
