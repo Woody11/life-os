@@ -45,6 +45,10 @@ const STATUS_DOT = {
   error:   'bg-red-400',
 };
 
+// Final stage per kanban pipeline (server/routes/kanban.js PIPELINES) — anything
+// else counts as "in progress" for the quick stats bar.
+const TERMINAL_KANBAN_STAGES = ['Published', 'Actioned'];
+
 function formatUpdated(iso) {
   if (!iso) return null;
   const dt = new Date(iso);
@@ -67,6 +71,19 @@ function useClock() {
     return () => clearInterval(id);
   }, []);
   return time;
+}
+
+// ---------------------------------------------------------------------------
+// Quick stat (compact stats bar)
+// ---------------------------------------------------------------------------
+
+function QuickStat({ label, value }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-bold text-white">{value}</div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +150,10 @@ export default function HomeTab() {
   const [dispatches, setDispatches] = useState([]);
   const [google, setGoogle]       = useState(null);
   const [googleLoading, setGoogleLoading] = useState(true);
+  const [goals, setGoals]         = useState([]);
+  const [habits, setHabits]       = useState([]);
+  const [kanbanCards, setKanbanCards] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const loadHome = useCallback(() => {
     setError(null);
@@ -149,14 +170,45 @@ export default function HomeTab() {
     return () => clearInterval(t);
   }, [loadHome]);
 
+  const loadDispatches = useCallback(() => {
+    return fetch('/api/dispatch')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((json) => setDispatches(json.dispatches ?? []))
+      .catch(() => {});
+  }, []);
+
+  const loadGoals = useCallback(() => {
+    return fetch('/api/goals')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((json) => setGoals(json.goals ?? []))
+      .catch(() => {});
+  }, []);
+
+  const loadHabits = useCallback(() => {
+    return fetch('/api/habits')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((json) => setHabits(json.habits ?? []))
+      .catch(() => {});
+  }, []);
+
+  const loadKanban = useCallback(() => {
+    return fetch('/api/kanban')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((json) => setKanbanCards(json.cards ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadDispatches();
+  }, [loadDispatches]);
+
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/dispatch')
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((json) => { if (!cancelled) setDispatches(json.dispatches ?? []); })
-      .catch(() => {});
+    Promise.all([loadGoals(), loadHabits(), loadKanban()]).finally(() => {
+      if (!cancelled) setStatsLoading(false);
+    });
     return () => { cancelled = true; };
-  }, []);
+  }, [loadGoals, loadHabits, loadKanban]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,11 +227,50 @@ export default function HomeTab() {
     return () => { cancelled = true; };
   }, []);
 
+  // Real-time updates: supplement the 60s /api/home poll with instant
+  // refreshes when dispatch/kanban activity happens elsewhere in the app.
+  useEffect(() => {
+    const es = new EventSource('/api/events');
+    es.addEventListener('dispatch_updated', () => {
+      loadDispatches();
+      loadHome();
+    });
+    es.addEventListener('kanban_updated', () => {
+      loadKanban();
+    });
+    es.onerror = () => {}; // browser auto-reconnects
+    return () => es.close();
+  }, [loadDispatches, loadHome, loadKanban]);
+
   const recentActivity = useMemo(() => {
     return [...dispatches]
       .sort((a, b) => new Date(b.completed_at || b.created_at) - new Date(a.completed_at || a.created_at))
       .slice(0, 8);
   }, [dispatches]);
+
+  const quickStats = useMemo(() => ({
+    activeGoals: goals.filter((g) => g.status === 'active').length,
+    habitsCompletedToday: habits.filter((h) => h.completed_today).length,
+    habitsTotal: habits.length,
+    pendingDispatches: dispatches.filter((d) => d.status === 'pending').length,
+    kanbanInProgress: kanbanCards.filter((c) => !TERMINAL_KANBAN_STAGES.includes(c.stage)).length,
+  }), [goals, habits, dispatches, kanbanCards]);
+
+  const todayStr = clock.toISOString().slice(0, 10);
+  const isPastEvening = clock.getHours() >= 20;
+  const overdueGoals = useMemo(
+    () => goals.filter((g) => g.status === 'active' && g.target_date && g.target_date < todayStr),
+    [goals, todayStr],
+  );
+  const missedHabits = useMemo(() => habits.filter((h) => !h.completed_today), [habits]);
+
+  const bannerItems = [];
+  if (overdueGoals.length > 0) {
+    bannerItems.push(`${overdueGoals.length} overdue goal${overdueGoals.length > 1 ? 's' : ''}`);
+  }
+  if (isPastEvening && missedHabits.length > 0) {
+    bannerItems.push(`${missedHabits.length} habit${missedHabits.length > 1 ? 's' : ''} not done today`);
+  }
 
   const greeting  = getGreeting();
   const timeStr   = clock.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -218,8 +309,16 @@ export default function HomeTab() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
 
+      {/* Overdue goal / missed habit banner */}
+      {bannerItems.length > 0 && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-sm text-rose-300">
+          <span>⚠</span>
+          <span>{bannerItems.join(' · ')}</span>
+        </div>
+      )}
+
       {/* ── Hero header ── */}
-      <div className="mb-10 flex items-start justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium text-indigo-400">{dateStr}</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">
@@ -228,7 +327,7 @@ export default function HomeTab() {
         </div>
 
         {/* Digital clock */}
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-start sm:items-end">
           <div className="font-mono text-3xl font-semibold tabular-nums text-white">
             {timeStr}
           </div>
@@ -238,6 +337,17 @@ export default function HomeTab() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* ── Quick stats bar ── */}
+      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <QuickStat label="Active Goals" value={statsLoading ? '—' : quickStats.activeGoals} />
+        <QuickStat
+          label="Habits Today"
+          value={statsLoading ? '—' : `${quickStats.habitsCompletedToday}/${quickStats.habitsTotal}`}
+        />
+        <QuickStat label="Pending Dispatches" value={statsLoading ? '—' : quickStats.pendingDispatches} />
+        <QuickStat label="Kanban In Progress" value={statsLoading ? '—' : quickStats.kanbanInProgress} />
       </div>
 
       {/* Morning brief */}
