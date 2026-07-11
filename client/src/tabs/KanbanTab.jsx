@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import Toast from '../components/Toast.jsx';
 
 // ---------------------------------------------------------------------------
@@ -130,9 +140,12 @@ function AddCardModal({ domain, onAdd, onCancel }) {
 // Card detail panel
 // ---------------------------------------------------------------------------
 
-function CardDetail({ card, onClose, onDelete, pipeline }) {
+function CardDetail({ card, onClose, onDelete, onUpdateCard, pipeline }) {
   const [log, setLog]               = useState([]);
   const [logLoading, setLogLoading] = useState(true);
+  const [notes, setNotes]           = useState(card.notes ?? '');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved]   = useState(false);
 
   useEffect(() => {
     fetch(`/api/kanban/${card.id}/log`)
@@ -141,6 +154,28 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
       .catch(() => {})
       .finally(() => setLogLoading(false));
   }, [card.id]);
+
+  async function handleNotesBlur() {
+    if (notes === (card.notes ?? '')) return;
+    setNotesSaving(true);
+    try {
+      const res = await fetch(`/api/kanban/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      onUpdateCard?.(json.card);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2000);
+    } catch {
+      // Silent failure — the textarea keeps the user's unsaved value so they
+      // can retry on the next blur without losing what they typed.
+    } finally {
+      setNotesSaving(false);
+    }
+  }
 
   function relTime(iso) {
     if (!iso) return '';
@@ -185,6 +220,22 @@ function CardDetail({ card, onClose, onDelete, pipeline }) {
               Agent dispatch pending for this stage
             </div>
           )}
+
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Notes</p>
+              {notesSaving && <span className="text-xs text-slate-500">Saving…</span>}
+              {!notesSaving && notesSaved && <span className="text-xs text-emerald-400">Saved ✓</span>}
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={handleNotesBlur}
+              rows={3}
+              placeholder="Add notes…"
+              className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-500/50 focus:outline-none transition-colors"
+            />
+          </div>
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Activity</p>
@@ -247,34 +298,64 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
           const stageCards = cards.filter((c) => c.stage === stage);
           const agentName  = pipeline.agents[stage];
           return (
-            <div key={stage} className="w-48 min-w-48 shrink-0">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  {stage}
-                </span>
-                {agentName && (
-                  <span className="text-xs text-indigo-400">{agentName}</span>
-                )}
-              </div>
-
-              <div className="min-h-16 space-y-2 rounded-xl border border-white/[0.04] bg-black/20 p-2">
-                {stageCards.map((card) => (
-                  <KanbanCardTile
-                    key={card.id}
-                    card={card}
-                    pipeline={pipeline}
-                    onClick={() => onCardClick(card)}
-                    onMove={(targetStage) => onMoveCard(card, targetStage)}
-                    onDelete={onDeleteCard}
-                  />
-                ))}
-                {stageCards.length === 0 && (
-                  <p className="py-3 text-center text-xs text-slate-700">—</p>
-                )}
-              </div>
-            </div>
+            <KanbanColumn
+              key={stage}
+              domain={domain}
+              stage={stage}
+              agentName={agentName}
+              stageCards={stageCards}
+              pipeline={pipeline}
+              onCardClick={onCardClick}
+              onMoveCard={onMoveCard}
+              onDeleteCard={onDeleteCard}
+            />
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A single droppable stage column
+// ---------------------------------------------------------------------------
+
+function KanbanColumn({ domain, stage, agentName, stageCards, pipeline, onCardClick, onMoveCard, onDeleteCard }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `${domain}-${stage}`,
+    data: { domain, stage },
+  });
+
+  return (
+    <div className="w-48 min-w-48 shrink-0">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {stage}
+        </span>
+        {agentName && (
+          <span className="text-xs text-indigo-400">{agentName}</span>
+        )}
+      </div>
+
+      <div
+        ref={setNodeRef}
+        className={`min-h-16 space-y-2 rounded-xl border p-2 transition-colors ${
+          isOver ? 'border-indigo-500/40 bg-indigo-500/[0.06]' : 'border-white/[0.04] bg-black/20'
+        }`}
+      >
+        {stageCards.map((card) => (
+          <KanbanCardTile
+            key={card.id}
+            card={card}
+            pipeline={pipeline}
+            onClick={() => onCardClick(card)}
+            onMove={(targetStage) => onMoveCard(card, targetStage)}
+            onDelete={onDeleteCard}
+          />
+        ))}
+        {stageCards.length === 0 && (
+          <p className="py-3 text-center text-xs text-slate-700">—</p>
+        )}
       </div>
     </div>
   );
@@ -284,14 +365,34 @@ function KanbanBoard({ domain, pipeline, cards, onMoveCard, onCardClick, onAddCa
 // Individual card tile
 // ---------------------------------------------------------------------------
 
-function KanbanCardTile({ card, pipeline, onClick, onMove, onDelete }) {
+function KanbanCardTile({ card, pipeline, onClick, onMove, onDelete, isOverlay = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const currentIdx = pipeline.stages.indexOf(card.stage);
   const canMoveBack = currentIdx > 0;
   const canMoveFwd  = currentIdx < pipeline.stages.length - 1;
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: card.id,
+    data: { card },
+    disabled: isOverlay,
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging && !isOverlay ? 0.4 : undefined,
+    cursor: isOverlay ? 'grabbing' : 'grab',
+  };
+
   return (
-    <div className="group relative rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 shadow-sm transition-colors hover:border-white/10 hover:bg-white/[0.06]">
+    <div
+      ref={isOverlay ? undefined : setNodeRef}
+      style={style}
+      {...(isOverlay ? {} : listeners)}
+      {...(isOverlay ? {} : attributes)}
+      className={`group relative rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 shadow-sm transition-colors hover:border-white/10 hover:bg-white/[0.06] ${
+        isOverlay ? 'rotate-2 shadow-2xl' : ''
+      }`}
+    >
       {card.agent_pending === 1 && (
         <span
           className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-indigo-400"
@@ -382,6 +483,11 @@ export default function KanbanTab() {
   const [addDomain, setAddDomain]           = useState(null);
   const [detailCard, setDetailCard]         = useState(null);
   const [toast, setToast]                   = useState(null);
+  const [activeCard, setActiveCard]         = useState(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   const load = useCallback(async () => {
     try {
@@ -401,6 +507,32 @@ export default function KanbanTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const es = new EventSource('/api/events');
+    es.addEventListener('kanban_updated', (e) => {
+      const { id, stage } = JSON.parse(e.data);
+      setCards((prev) => prev.map((c) => (c.id === id ? { ...c, stage } : c)));
+    });
+    es.onerror = () => {};
+    return () => es.close();
+  }, []);
+
+  function handleDragStart(event) {
+    setActiveCard(event.active.data.current?.card ?? null);
+  }
+
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    setActiveCard(null);
+    if (!over) return;
+    const card = active.data.current?.card;
+    const { domain: targetDomain, stage: targetStage } = over.data.current ?? {};
+    if (!card || !targetStage) return;
+    if (targetDomain && targetDomain !== card.domain) return;
+    if (targetStage === card.stage) return;
+    handleMoveRequest(card, targetStage);
+  }
 
   function handleMoveRequest(card, targetStage) {
     if (targetStage === card.stage) return;
@@ -496,21 +628,29 @@ export default function KanbanTab() {
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Kanban</h1>
       </div>
 
-      <div className="space-y-6">
-        {pipelines && Object.entries(pipelines).map(([domain, pipeline]) => (
-          <div key={domain} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
-            <KanbanBoard
-              domain={domain}
-              pipeline={pipeline}
-              cards={cards.filter((c) => c.domain === domain)}
-              onMoveCard={handleMoveRequest}
-              onCardClick={setDetailCard}
-              onAddCard={setAddDomain}
-              onDeleteCard={handleDelete}
-            />
-          </div>
-        ))}
-      </div>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="space-y-6">
+          {pipelines && Object.entries(pipelines).map(([domain, pipeline]) => (
+            <div key={domain} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
+              <KanbanBoard
+                domain={domain}
+                pipeline={pipeline}
+                cards={cards.filter((c) => c.domain === domain)}
+                onMoveCard={handleMoveRequest}
+                onCardClick={setDetailCard}
+                onAddCard={setAddDomain}
+                onDeleteCard={handleDelete}
+              />
+            </div>
+          ))}
+        </div>
+
+        <DragOverlay>
+          {activeCard && (
+            <KanbanCardTile card={activeCard} pipeline={pipelines[activeCard.domain]} isOverlay />
+          )}
+        </DragOverlay>
+      </DndContext>
 
       <Toast message={toast} onClose={() => setToast(null)} />
 
@@ -539,6 +679,10 @@ export default function KanbanTab() {
           pipeline={pipelines[detailCard.domain]}
           onClose={() => setDetailCard(null)}
           onDelete={handleDelete}
+          onUpdateCard={(updated) => {
+            setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            setDetailCard(updated);
+          }}
         />
       )}
     </div>
