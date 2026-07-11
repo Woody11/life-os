@@ -93,9 +93,12 @@ export default function MorningBriefCard() {
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Priority Emails</p>
               <div className="space-y-1">
                 {brief.priority_emails.map((em, i) => (
-                  <div key={i} className="text-sm">
+                  <div key={i} className="text-sm flex flex-wrap items-baseline gap-x-1.5">
+                    {em.account && (
+                      <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-indigo-500/20 text-indigo-300">{em.account}</span>
+                    )}
                     <span className="font-medium text-slate-300">{em.from}</span>
-                    <span className="text-slate-500"> — {em.subject}</span>
+                    <span className="text-slate-500">— {em.subject}</span>
                   </div>
                 ))}
               </div>
