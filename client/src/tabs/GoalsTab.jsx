@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RadialBarChart, RadialBar, Cell } from 'recharts';
 import Toast from '../components/Toast.jsx';
 
 const DOMAIN_COLORS = {
@@ -11,6 +12,21 @@ const DOMAIN_COLORS = {
 const AGENTS = ['Bazza', 'Sherlock', 'Buffet', 'Shakespeare', 'Jarvis', 'Maverick', 'Statty', 'Linus'];
 const DOMAINS = ['SMSF', 'MBS', 'Personal', 'Dev'];
 const STATUSES = ['active', 'completed', 'paused'];
+
+function ProgressRing({ value }) {
+  const data = [{ value }];
+  return (
+    <RadialBarChart width={56} height={56} cx={28} cy={28} innerRadius={20} outerRadius={28}
+      startAngle={90} endAngle={-270} data={data}>
+      <RadialBar dataKey="value" cornerRadius={4} background={{ fill: 'rgba(255,255,255,0.04)' }}>
+        <Cell fill={value >= 100 ? '#34d399' : value >= 50 ? '#6366f1' : '#f59e0b'} />
+      </RadialBar>
+      <text x={28} y={28} textAnchor="middle" dominantBaseline="middle" className="fill-slate-200" style={{ fontSize: 11, fontWeight: 600 }}>
+        {value}%
+      </text>
+    </RadialBarChart>
+  );
+}
 
 function ProgressBar({ value, onChange }) {
   const [localValue, setLocalValue] = useState(value);
@@ -44,7 +60,11 @@ function AgentDispatchButton({ goalId, agentRow, onDispatched }) {
   async function fire() {
     setState('loading');
     try {
-      const res = await fetch(`/api/goals/${goalId}/dispatch/${agentRow.id}`, { method: 'POST' });
+      const res = await fetch(`/api/goals/${goalId}/dispatch/${agentRow.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agentRow.model ? { model: agentRow.model } : {}),
+      });
       if (res.ok) {
         setState('done');
         onDispatched?.(agentRow.agent_name);
@@ -72,9 +92,9 @@ function AgentDispatchButton({ goalId, agentRow, onDispatched }) {
   );
 }
 
-function GoalCard({ goal, onUpdate, onDelete, onToast }) {
+function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
   const [showAddAgent, setShowAddAgent] = useState(false);
-  const [newAgent, setNewAgent] = useState({ agent_name: AGENTS[0], prompt_template: '', button_label: '' });
+  const [newAgent, setNewAgent] = useState({ agent_name: AGENTS[0], prompt_template: '', button_label: '', model: '' });
 
   async function patchProgress(progress) {
     const res = await fetch(`/api/goals/${goal.id}`, {
@@ -104,8 +124,8 @@ function GoalCard({ goal, onUpdate, onDelete, onToast }) {
     });
     if (res.ok) {
       const added = await res.json();
-      onUpdate({ ...goal, agents: [...(goal.agents ?? []), added] });
-      setNewAgent({ agent_name: AGENTS[0], prompt_template: '', button_label: '' });
+      onUpdate({ ...goal, agents: [...(goal.agents ?? []), { ...added, model: newAgent.model || added.model } ] });
+      setNewAgent({ agent_name: AGENTS[0], prompt_template: '', button_label: '', model: '' });
       setShowAddAgent(false);
     }
   }
@@ -145,6 +165,7 @@ function GoalCard({ goal, onUpdate, onDelete, onToast }) {
             <p className="mt-1 text-sm text-slate-500">{goal.description}</p>
           )}
         </div>
+        <div className="shrink-0"><ProgressRing value={goal.progress} /></div>
         <div className="flex items-center gap-2 shrink-0">
           <select
             value={goal.status}
@@ -201,6 +222,19 @@ function GoalCard({ goal, onUpdate, onDelete, onToast }) {
             rows={2}
             className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none resize-none"
           />
+          <div>
+            <label className="mb-1 block text-[10px] text-slate-600">Model override</label>
+            <select
+              value={newAgent.model}
+              onChange={(e) => setNewAgent((p) => ({ ...p, model: e.target.value }))}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
+            >
+              <option value="">Default (system)</option>
+              {models?.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex gap-2">
             <button type="submit" className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300 hover:bg-indigo-500/20">Save</button>
             <button type="button" onClick={() => setShowAddAgent(false)} className="text-xs text-slate-600 hover:text-slate-400">Cancel</button>
@@ -292,12 +326,55 @@ function AddGoalForm({ onAdd }) {
 }
 
 const FILTER_TABS = ['all', 'active', 'completed', 'paused'];
+const DOMAIN_FILTERS = ['all', ...DOMAINS];
+
+function GoalsStats({ goals }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthPrefix = today.slice(0, 7);
+
+  const active = goals.filter((g) => g.status === 'active');
+  const overdue = active.filter((g) => g.target_date && g.target_date < today);
+
+  const onTrack = active.filter((g) => {
+    if (!g.target_date || !g.created_at) return g.progress >= 100;
+    const start = new Date(g.created_at).getTime();
+    const end = new Date(g.target_date + 'T00:00:00Z').getTime();
+    const now = Date.now();
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return g.progress >= 100;
+    const expected = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+    return g.progress >= expected;
+  });
+
+  const completedThisMonth = goals.filter(
+    (g) => g.status === 'completed' && (g.updated_at ?? '').slice(0, 7) === monthPrefix,
+  );
+
+  const stats = [
+    { label: 'Active goals', value: active.length },
+    { label: 'On track', value: onTrack.length },
+    { label: 'Overdue', value: overdue.length, warn: overdue.length > 0 },
+    { label: 'Completed this month', value: completedThisMonth.length },
+  ];
+
+  return (
+    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {stats.map((s) => (
+        <div key={s.label} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+          <p className={`text-xl font-bold ${s.warn ? 'text-amber-400' : 'text-white'}`}>{s.value}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">{s.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function GoalsTab() {
   const [goals, setGoals]   = useState([]);
   const [filter, setFilter] = useState('active');
+  const [domainFilter, setDomainFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [models, setModels] = useState([]);
 
   useEffect(() => {
     fetch('/api/goals')
@@ -305,6 +382,13 @@ export default function GoalsTab() {
       .then((d) => setGoals(d.goals ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/dispatch/models')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((json) => setModels((json.models ?? []).filter((m) => m.id)))
+      .catch(() => setModels([]));
   }, []);
 
   function handleAdd(goal)    { setGoals((p) => [goal, ...p]); }
@@ -315,7 +399,9 @@ export default function GoalsTab() {
     if (res.ok) setGoals((p) => p.filter((g) => g.id !== id));
   }
 
-  const filtered = filter === 'all' ? goals : goals.filter((g) => g.status === filter);
+  const filtered = goals
+    .filter((g) => filter === 'all' || g.status === filter)
+    .filter((g) => domainFilter === 'all' || g.domain === domainFilter);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -324,8 +410,10 @@ export default function GoalsTab() {
         <p className="mt-1 text-sm text-slate-500">{goals.filter((g) => g.status === 'active').length} active</p>
       </div>
 
+      <GoalsStats goals={goals} />
+
       {/* Filter chips */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-3 flex gap-2">
         {FILTER_TABS.map((f) => (
           <button key={f} onClick={() => setFilter(f)}
             className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition-all ${
@@ -334,6 +422,20 @@ export default function GoalsTab() {
                 : 'border border-white/5 text-slate-500 hover:text-slate-300'
             }`}>
             {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Domain filter chips */}
+      <div className="mb-6 flex gap-2">
+        {DOMAIN_FILTERS.map((d) => (
+          <button key={d} onClick={() => setDomainFilter(d)}
+            className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition-all ${
+              domainFilter === d
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                : 'border border-white/5 text-slate-500 hover:text-slate-300'
+            }`}>
+            {d === 'all' ? 'All domains' : d}
           </button>
         ))}
       </div>
@@ -354,7 +456,7 @@ export default function GoalsTab() {
       ) : (
         <div className="space-y-3">
           {filtered.map((g) => (
-            <GoalCard key={g.id} goal={g} onUpdate={handleUpdate} onDelete={handleDelete} onToast={setToast} />
+            <GoalCard key={g.id} goal={g} onUpdate={handleUpdate} onDelete={handleDelete} onToast={setToast} models={models} />
           ))}
         </div>
       )}
