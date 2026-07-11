@@ -41,8 +41,9 @@ router.get('/models', (_req, res) => {
     { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol' },
     { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna' },
     { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra' },
-    { id: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5' },
     { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8' },
+    { id: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
     { id: 'anthropic/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
     { id: 'xai/grok-4.20-beta-latest-reasoning', label: 'Grok 4.20 Reasoning' },
   ]});
