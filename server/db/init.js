@@ -50,6 +50,60 @@ function initDb() {
   if (!syncQueueCols.has('status')) {
     db.prepare("ALTER TABLE obsidian_sync_queue ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'").run();
   }
+  // Add UNIQUE(vault_path) to obsidian_sync_queue if missing — requires table rebuild in SQLite.
+  const syncIndexes = db.pragma('index_list(obsidian_sync_queue)');
+  const hasUniqueVaultPath = syncIndexes.some((idx) =>
+    idx.unique === 1 &&
+    db.pragma(`index_info(${idx.name})`).some((col) => col.name === 'vault_path'),
+  );
+  if (!hasUniqueVaultPath) {
+    db.exec(`
+      CREATE TABLE obsidian_sync_queue_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id   INTEGER NOT NULL,
+        payload     TEXT NOT NULL,
+        vault_path  TEXT NOT NULL UNIQUE,
+        attempts    INTEGER DEFAULT 0,
+        last_error  TEXT,
+        status      TEXT NOT NULL DEFAULT 'pending',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        next_attempt_at TEXT
+      );
+      INSERT OR IGNORE INTO obsidian_sync_queue_new
+        SELECT id, entity_type, entity_id, payload, vault_path, attempts, last_error,
+               COALESCE(status, 'pending'), created_at, next_attempt_at
+        FROM obsidian_sync_queue
+        ORDER BY created_at DESC;
+      DROP TABLE obsidian_sync_queue;
+      ALTER TABLE obsidian_sync_queue_new RENAME TO obsidian_sync_queue;
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_next ON obsidian_sync_queue(attempts, next_attempt_at);
+    `);
+  }
+
+  // Add model column to goal_agents if missing.
+  const goalAgentCols = new Set(db.pragma('table_info(goal_agents)').map((c) => c.name));
+  if (!goalAgentCols.has('model')) {
+    db.prepare('ALTER TABLE goal_agents ADD COLUMN model TEXT').run();
+  }
+
+  // Add ON DELETE CASCADE to kanban_stage_dispatches.dispatch_id if missing.
+  const stageFks = db.pragma('foreign_key_list(kanban_stage_dispatches)');
+  const hasDispatchCascade = stageFks.some((fk) => fk.from === 'dispatch_id' && fk.on_delete === 'CASCADE');
+  if (!hasDispatchCascade) {
+    db.exec(`
+      CREATE TABLE kanban_stage_dispatches_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id     INTEGER NOT NULL REFERENCES kanban_cards(id) ON DELETE CASCADE,
+        stage       TEXT NOT NULL,
+        dispatch_id INTEGER NOT NULL REFERENCES dispatches(id) ON DELETE CASCADE,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO kanban_stage_dispatches_new SELECT * FROM kanban_stage_dispatches;
+      DROP TABLE kanban_stage_dispatches;
+      ALTER TABLE kanban_stage_dispatches_new RENAME TO kanban_stage_dispatches;
+    `);
+  }
 
   const kanbanCols = new Set(db.pragma('table_info(kanban_cards)').map((c) => c.name));
   if (!kanbanCols.has('notes')) db.prepare('ALTER TABLE kanban_cards ADD COLUMN notes TEXT').run();

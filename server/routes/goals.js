@@ -115,7 +115,7 @@ router.delete('/:id', asyncHandler((req, res) => {
 
 // POST /api/goals/:id/agents
 router.post('/:id/agents', asyncHandler((req, res) => {
-  const { agent_name, prompt_template, button_label, sort_order = 0 } = req.body ?? {};
+  const { agent_name, prompt_template, button_label, sort_order = 0, model } = req.body ?? {};
   if (!agent_name?.trim() || !prompt_template?.trim() || !button_label?.trim()) {
     return res.status(400).json({ error: 'agent_name, prompt_template, and button_label are required' });
   }
@@ -123,8 +123,8 @@ router.post('/:id/agents', asyncHandler((req, res) => {
     const goal = getDb().prepare('SELECT id FROM goals WHERE id = ?').get(req.params.id);
     if (!goal) return res.status(404).json({ error: 'Goal not found' });
     const info = getDb()
-      .prepare('INSERT INTO goal_agents (goal_id, agent_name, prompt_template, button_label, sort_order) VALUES (?, ?, ?, ?, ?)')
-      .run(req.params.id, agent_name.trim(), prompt_template.trim(), button_label.trim(), sort_order);
+      .prepare('INSERT INTO goal_agents (goal_id, agent_name, prompt_template, button_label, sort_order, model) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(req.params.id, agent_name.trim(), prompt_template.trim(), button_label.trim(), sort_order, model?.trim() || null);
     res.status(201).json(getDb().prepare('SELECT * FROM goal_agents WHERE id = ?').get(info.lastInsertRowid));
   } catch {
     res.status(500).json({ error: 'Failed to add agent' });
@@ -156,7 +156,7 @@ router.post('/:id/dispatch/:agentId', asyncHandler((req, res) => {
       .replace(/\{\{goal_title\}\}/g, goal.title)
       .replace(/\{\{goal_description\}\}/g, goal.description ?? '');
 
-    const dispatch = dispatchAgent(agentRow.agent_name, prompt);
+    const dispatch = dispatchAgent(agentRow.agent_name, prompt, agentRow.model || null);
     res.status(201).json(dispatch);
   } catch {
     res.status(500).json({ error: 'Failed to dispatch agent' });

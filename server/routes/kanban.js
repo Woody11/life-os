@@ -195,7 +195,14 @@ function queueObsidianSync(db, entityType, entityId, payload) {
   try {
     db.prepare(
       `INSERT INTO obsidian_sync_queue (entity_type, entity_id, payload, vault_path)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(vault_path) DO UPDATE SET
+         entity_id = excluded.entity_id,
+         payload   = excluded.payload,
+         attempts  = 0,
+         last_error = NULL,
+         status    = 'pending',
+         next_attempt_at = NULL`,
     ).run(entityType, entityId, JSON.stringify(payload), vaultPath);
   } catch {
     // sync is fire-and-forget; never block the main response

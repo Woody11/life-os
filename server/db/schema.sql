@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS kanban_stage_dispatches (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   card_id     INTEGER NOT NULL REFERENCES kanban_cards(id) ON DELETE CASCADE,
   stage       TEXT NOT NULL,
-  dispatch_id INTEGER NOT NULL REFERENCES dispatches(id),
+  dispatch_id INTEGER NOT NULL REFERENCES dispatches(id) ON DELETE CASCADE,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -50,9 +50,10 @@ CREATE TABLE IF NOT EXISTS obsidian_sync_queue (
   entity_type TEXT NOT NULL,
   entity_id   INTEGER NOT NULL,
   payload     TEXT NOT NULL,
-  vault_path  TEXT NOT NULL,
+  vault_path  TEXT NOT NULL UNIQUE,
   attempts    INTEGER DEFAULT 0,
   last_error  TEXT,
+  status      TEXT NOT NULL DEFAULT 'pending',
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   next_attempt_at TEXT
 );
@@ -101,7 +102,8 @@ CREATE TABLE IF NOT EXISTS goal_agents (
   agent_name      TEXT    NOT NULL,
   prompt_template TEXT    NOT NULL,
   button_label    TEXT    NOT NULL,
-  sort_order      INTEGER NOT NULL DEFAULT 0
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  model           TEXT
 );
 
 -- Per-agent default model config

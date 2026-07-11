@@ -1,4 +1,5 @@
 const express = require('express');
+const { todayAdelaide } = require('../lib/adelaideTime');
 
 const router = express.Router();
 
@@ -64,14 +65,14 @@ router.get('/stats', async (_req, res) => {
   }
 });
 
-// Whole days from today (UTC) until an ISO "YYYY-MM-DD" date. Negative if past.
+// Whole days from today (Adelaide time) until an ISO "YYYY-MM-DD" date. Negative if past.
 function daysUntil(iso) {
   if (!iso) return null;
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return null;
   const target = Date.UTC(y, m - 1, d);
-  const now = new Date();
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const [ty, tm, td] = todayAdelaide().split('-').map(Number);
+  const today = Date.UTC(ty, tm - 1, td);
   return Math.round((target - today) / 86400000);
 }
 

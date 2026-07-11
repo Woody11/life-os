@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
+import { useSse } from '../components/SseContext.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -227,20 +228,14 @@ export default function HomeTab() {
     return () => { cancelled = true; };
   }, []);
 
-  // Real-time updates: supplement the 60s /api/home poll with instant
-  // refreshes when dispatch/kanban activity happens elsewhere in the app.
+  // Real-time updates via shared SSE connection.
+  const { subscribe } = useSse();
   useEffect(() => {
-    const es = new EventSource('/api/events');
-    es.addEventListener('dispatch_updated', () => {
-      loadDispatches();
-      loadHome();
-    });
-    es.addEventListener('kanban_updated', () => {
-      loadKanban();
-    });
-    es.onerror = () => {}; // browser auto-reconnects
-    return () => es.close();
-  }, [loadDispatches, loadHome, loadKanban]);
+    const unsub1 = subscribe(() => { loadDispatches(); loadHome(); }, 'dispatch_updated');
+    const unsub2 = subscribe(() => { loadDispatches(); loadHome(); }, 'dispatch_created');
+    const unsub3 = subscribe(() => { loadKanban(); }, 'kanban_updated');
+    return () => { unsub1(); unsub2(); unsub3(); };
+  }, [subscribe, loadDispatches, loadHome, loadKanban]);
 
   const recentActivity = useMemo(() => {
     return [...dispatches]

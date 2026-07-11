@@ -7,6 +7,7 @@ import DispatchTab from './tabs/DispatchTab.jsx';
 import KanbanTab   from './tabs/KanbanTab.jsx';
 import HabitsTab   from './tabs/HabitsTab.jsx';
 import GoalsTab    from './tabs/GoalsTab.jsx';
+import { SseProvider } from './components/SseContext.jsx';
 
 const TABS = [
   { to: '/',         label: 'Home',     end: true },
@@ -485,20 +486,22 @@ export default function App() {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)]">
-        <NavBar theme={theme} toggleTheme={toggleTheme} />
-        <main>
-          <Routes>
-            <Route path="/"        element={<HomeTab />} />
-            <Route path="/smsf"    element={<SmsfTab />} />
-            <Route path="/mbs"     element={<MbsTab />} />
-            <Route path="/dispatch" element={<DispatchTab />} />
-            <Route path="/kanban"  element={<KanbanTab />} />
-            <Route path="/habits"  element={<HabitsTab />} />
-            <Route path="/goals"   element={<GoalsTab />} />
-          </Routes>
-        </main>
-      </div>
+      <SseProvider>
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)]">
+          <NavBar theme={theme} toggleTheme={toggleTheme} />
+          <main>
+            <Routes>
+              <Route path="/"        element={<HomeTab />} />
+              <Route path="/smsf"    element={<SmsfTab />} />
+              <Route path="/mbs"     element={<MbsTab />} />
+              <Route path="/dispatch" element={<DispatchTab />} />
+              <Route path="/kanban"  element={<KanbanTab />} />
+              <Route path="/habits"  element={<HabitsTab />} />
+              <Route path="/goals"   element={<GoalsTab />} />
+            </Routes>
+          </main>
+        </div>
+      </SseProvider>
     </HashRouter>
   );
 }

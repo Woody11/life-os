@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -108,17 +108,26 @@ function formatSignedAud(value) {
   return `${sign}${formatAud(n)}`;
 }
 
-function AllocationSection() {
+function AllocationSection({ dividends }) {
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
   // Live prices load independently and never block the allocation table.
   const [prices, setPrices] = useState({ status: 'loading', byTicker: {}, totals: null });
-  // Annual dividend total — best-effort, degrades to null.
-  const [annualDivTotal, setAnnualDivTotal] = useState(null);
+
+  // Compute annual dividend total from the shared dividends prop.
+  const annualDivTotal = (() => {
+    if (!Array.isArray(dividends)) return null;
+    const total = dividends.reduce((sum, d) => {
+      if (d.dividend_amount != null && d.total_quantity != null) {
+        return sum + d.dividend_amount * d.total_quantity;
+      }
+      return sum;
+    }, 0);
+    return total > 0 ? Math.round(total * 100) / 100 : null;
+  })();
 
   const load = useCallback(async (signal) => {
     setState({ status: 'loading', data: null, error: null });
     setPrices({ status: 'loading', byTicker: {}, totals: null });
-    setAnnualDivTotal(null);
 
     // Allocation (cost basis / deviation) is the primary payload.
     try {
@@ -142,23 +151,6 @@ function AllocationSection() {
     } catch (err) {
       if (err.name === 'AbortError') return;
       setPrices({ status: 'error', byTicker: {}, totals: null });
-    }
-
-    // Annual dividends — sum shares × annual_div_per_share across all holdings.
-    try {
-      const res = await fetch('/api/smsf/dividends', { signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const total = (json.dividends ?? []).reduce((sum, d) => {
-        if (d.dividend_amount != null && d.total_quantity != null) {
-          return sum + d.dividend_amount * d.total_quantity;
-        }
-        return sum;
-      }, 0);
-      setAnnualDivTotal(total > 0 ? Math.round(total * 100) / 100 : null);
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      // Silently degrade — dividend total is non-critical
     }
   }, []);
 
@@ -316,27 +308,8 @@ function AllocationSection() {
 // Section B — Dividend Calendar
 // ---------------------------------------------------------------------------
 
-function DividendSection() {
-  const [state, setState] = useState({ status: 'loading', data: null, error: null });
-
-  const load = useCallback(async (signal) => {
-    setState({ status: 'loading', data: null, error: null });
-    try {
-      const res = await fetch('/api/smsf/dividends', { signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setState({ status: 'ready', data: json.dividends ?? [], error: null });
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      setState({ status: 'error', data: null, error: err.message || 'Failed to load' });
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+function DividendSection({ dividendsState, onRetry }) {
+  const state = dividendsState;
 
   const rows = state.data ?? [];
 
@@ -353,7 +326,7 @@ function DividendSection() {
         <div className="mt-4">
           <SectionError
             message={`Failed to load dividends: ${state.error}`}
-            onRetry={() => load()}
+            onRetry={onRetry}
           />
         </div>
       )}
@@ -595,6 +568,35 @@ function DispatchSection() {
 // ---------------------------------------------------------------------------
 
 export default function SmsfTab() {
+  const [dividendsState, setDividendsState] = useState({ status: 'loading', data: null, error: null });
+
+  const loadDividends = useCallback(async (signal) => {
+    setDividendsState({ status: 'loading', data: null, error: null });
+    try {
+      const res = await fetch('/api/smsf/dividends', { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setDividendsState({ status: 'ready', data: json.dividends ?? [], error: null });
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      setDividendsState({ status: 'error', data: null, error: err.message || 'Failed to load' });
+    }
+  }, []);
+
+  // Track abort controller so retry can abort any in-flight request.
+  const abortRef = useRef(null);
+  const retryDividends = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    loadDividends(abortRef.current.signal);
+  }, [loadDividends]);
+
+  useEffect(() => {
+    abortRef.current = new AbortController();
+    loadDividends(abortRef.current.signal);
+    return () => abortRef.current?.abort();
+  }, [loadDividends]);
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-8">
@@ -603,9 +605,9 @@ export default function SmsfTab() {
       </div>
 
       <div className="space-y-6">
-        <AllocationSection />
+        <AllocationSection dividends={dividendsState.data} />
 
-        <DividendSection />
+        <DividendSection dividendsState={dividendsState} onRetry={retryDividends} />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

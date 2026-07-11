@@ -11,8 +11,15 @@ function enqueueVaultSync(db, dispatch) {
   const slug = `${dispatch.id}-${dispatch.agent}`;
   const vaultPath = `60 Agent System/Dispatches/${date}-${slug}.md`;
   db.prepare(
-    `INSERT OR IGNORE INTO obsidian_sync_queue (entity_type, entity_id, payload, vault_path)
-     VALUES ('dispatch', ?, ?, ?)`,
+    `INSERT INTO obsidian_sync_queue (entity_type, entity_id, payload, vault_path)
+     VALUES ('dispatch', ?, ?, ?)
+     ON CONFLICT(vault_path) DO UPDATE SET
+       entity_id = excluded.entity_id,
+       payload   = excluded.payload,
+       attempts  = 0,
+       last_error = NULL,
+       status    = 'pending',
+       next_attempt_at = NULL`,
   ).run(dispatch.id, JSON.stringify(dispatch), vaultPath);
 }
 
@@ -196,7 +203,15 @@ router.post('/', (req, res) => {
   }
 
   try {
-    const dispatch = dispatchAgent(agent, prompt, model);
+    // Resolve model: explicit request > agent default from agent_models > null
+    let resolvedModel = model?.trim() || null;
+    if (!resolvedModel) {
+      const defaultRow = getDb().prepare('SELECT model FROM agent_models WHERE agent_name = ?').get(agent.trim());
+      resolvedModel = defaultRow?.model || null;
+    }
+
+    const dispatch = dispatchAgent(agent, prompt, resolvedModel);
+    emit('dispatch_created', { id: dispatch.id, agent: dispatch.agent, status: 'pending' });
     res.status(201).json({ ...dispatch, dispatch_id: dispatch.id });
   } catch {
     res.status(500).json({ error: 'Failed to record dispatch' });

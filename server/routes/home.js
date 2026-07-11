@@ -68,8 +68,8 @@ function titleCase(str) {
 function computeMbsFocus(schedule) {
   if (!Array.isArray(schedule) || schedule.length === 0) return null;
 
-  // Compare on date only (YYYY-MM-DD) to avoid timezone drift in the cutoff.
-  const today = new Date().toISOString().slice(0, 10);
+  // Compare on date only (YYYY-MM-DD) using Adelaide time to avoid midnight DST drift.
+  const today = todayAdelaide();
 
   const upcoming = schedule
     .filter(

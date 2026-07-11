@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSse } from '../components/SseContext.jsx';
 import {
   DndContext,
   DragOverlay,
@@ -415,10 +416,6 @@ function KanbanCardTile({ card, pipeline, onClick, onMove, onDelete, isOverlay =
         {card.title}
       </p>
 
-      {card.priority > 0 && (
-        <span className="mt-1 inline-block text-xs text-amber-400">P{card.priority}</span>
-      )}
-
       <div className="mt-2 flex items-center gap-1">
         {canMoveBack && (
           <button
@@ -508,15 +505,17 @@ export default function KanbanTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Real-time updates via shared SSE connection.
+  const { subscribe } = useSse();
   useEffect(() => {
-    const es = new EventSource('/api/events');
-    es.addEventListener('kanban_updated', (e) => {
-      const { id, stage } = JSON.parse(e.data);
-      setCards((prev) => prev.map((c) => (c.id === id ? { ...c, stage } : c)));
-    });
-    es.onerror = () => {};
-    return () => es.close();
-  }, []);
+    const unsub = subscribe((data) => {
+      const { id, stage } = data ?? {};
+      if (id != null && stage != null) {
+        setCards((prev) => prev.map((c) => (c.id === id ? { ...c, stage } : c)));
+      }
+    }, 'kanban_updated');
+    return unsub;
+  }, [subscribe]);
 
   function handleDragStart(event) {
     setActiveCard(event.active.data.current?.card ?? null);

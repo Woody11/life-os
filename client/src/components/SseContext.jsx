@@ -1,54 +1,39 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
-
-/**
- * SseContext — provides a single SSE connection to /api/events at the App level.
- *
- * Consumers can subscribe to real-time updates via useSse():
- *   const { lastMessage, subscribe } = useSse();
- *
- * subscribe(handler) registers a callback and returns an unsubscribe function:
- *   useEffect(() => {
- *     const unsub = subscribe((msg) => { ... });
- *     return unsub;
- *   }, [subscribe]);
- */
+import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 
 const SseContext = createContext(null);
 
+// Named SSE event types the server emits.
+const KNOWN_EVENTS = ['dispatch_updated', 'dispatch_created', 'kanban_updated'];
+
 export function SseProvider({ children }) {
-  const [lastMessage, setLastMessage] = useState(null);
-  const listenersRef = useRef(new Set());
+  // Map<eventType, Set<handler>>
+  const listenersRef = useRef(new Map());
 
   useEffect(() => {
     const es = new EventSource('/api/events');
 
-    es.onmessage = (event) => {
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch {
-        data = event.data;
-      }
-      setLastMessage(data);
-      listenersRef.current.forEach((fn) => fn(data));
-    };
+    KNOWN_EVENTS.forEach((type) => {
+      es.addEventListener(type, (event) => {
+        let data;
+        try { data = JSON.parse(event.data); } catch { data = event.data; }
+        (listenersRef.current.get(type) ?? new Set()).forEach((fn) => fn(data));
+      });
+    });
 
-    es.onerror = () => {
-      // Browser will auto-reconnect; nothing to do here.
-    };
-
-    return () => {
-      es.close();
-    };
+    es.onerror = () => {};
+    return () => es.close();
   }, []);
 
-  const subscribe = (handler) => {
-    listenersRef.current.add(handler);
-    return () => listenersRef.current.delete(handler);
-  };
+  const subscribe = useCallback((handler, eventType) => {
+    if (!listenersRef.current.has(eventType)) {
+      listenersRef.current.set(eventType, new Set());
+    }
+    listenersRef.current.get(eventType).add(handler);
+    return () => listenersRef.current.get(eventType)?.delete(handler);
+  }, []);
 
   return (
-    <SseContext.Provider value={{ lastMessage, subscribe }}>
+    <SseContext.Provider value={{ subscribe }}>
       {children}
     </SseContext.Provider>
   );

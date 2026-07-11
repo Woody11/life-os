@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Toast from '../components/Toast.jsx';
+import { useSse } from '../components/SseContext.jsx';
 
 // ---------------------------------------------------------------------------
 // Status styling
@@ -657,15 +658,14 @@ export default function DispatchTab() {
     return () => controller.abort();
   }, [load]);
 
-  // Real-time updates via SSE
+  // Real-time updates via shared SSE connection.
+  const { subscribe } = useSse();
   useEffect(() => {
-    const es = new EventSource('/api/events');
-    es.addEventListener('dispatch_updated', () => {
-      load(new AbortController().signal);
-    });
-    es.onerror = () => {}; // auto-reconnects
-    return () => es.close();
-  }, [load]);
+    const refresh = () => load(new AbortController().signal);
+    const unsub1 = subscribe(refresh, 'dispatch_updated');
+    const unsub2 = subscribe(refresh, 'dispatch_created');
+    return () => { unsub1(); unsub2(); };
+  }, [subscribe, load]);
 
   // Live clock (every second)
   useEffect(() => {
