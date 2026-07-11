@@ -58,6 +58,34 @@ router.get('/', (_req, res) => {
   }
 });
 
+// GET /api/habits/:id/history?days=N — daily completion booleans for the
+// heatmap, oldest first. Clamped to [1, 365] so a bad query param can't force
+// an unbounded scan.
+router.get('/:id/history', (req, res) => {
+  try {
+    const habit = getDb().prepare('SELECT id FROM habits WHERE id = ?').get(req.params.id);
+    if (!habit) return res.status(404).json({ error: 'Not found' });
+
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const today = todayAdelaide();
+    const since = shiftDate(today, -(days - 1));
+
+    const rows = getDb()
+      .prepare('SELECT completed_date FROM habit_completions WHERE habit_id = ? AND completed_date >= ?')
+      .all(req.params.id, since);
+    const completedSet = new Set(rows.map((r) => r.completed_date));
+
+    const history = Array.from({ length: days }, (_, i) => {
+      const date = shiftDate(since, i);
+      return { date, completed: completedSet.has(date) };
+    });
+
+    res.json({ habit_id: Number(req.params.id), days, history });
+  } catch {
+    res.status(500).json({ error: 'Failed to load habit history' });
+  }
+});
+
 // POST /api/habits
 router.post('/', (req, res) => {
   const { name, emoji } = req.body ?? {};
