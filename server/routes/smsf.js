@@ -74,29 +74,35 @@ function computeSummary(holdingsPayload) {
   const holdings = holdingsPayload?.data ?? [];
 
   // First pass: native + AUD cost basis, and the running portfolio total.
+  // A holding with a non-numeric quantity/cost is marked invalid and excluded
+  // from the total rather than propagating NaN — one malformed upstream
+  // record would otherwise poison the entire allocation summary.
   const rows = holdings.map((h) => {
     const qty = Number(h.total_quantity);
     const avg = Number(h.average_cost);
-    const costNative = round2(qty * avg);
+    const valid = Number.isFinite(qty) && Number.isFinite(avg);
     const isUsd = String(h.asset_class).startsWith('US_');
-    const costAud = round2(costNative * (isUsd ? USD_TO_AUD : 1));
+    const costNative = valid ? round2(qty * avg) : null;
+    const costAud = valid ? round2(costNative * (isUsd ? USD_TO_AUD : 1)) : null;
     return {
       ticker: h.ticker,
       name: h.name,
       asset_class: h.asset_class,
       currency: h.currency,
-      total_quantity: qty,
-      average_cost: avg,
+      total_quantity: Number.isFinite(qty) ? qty : null,
+      average_cost: Number.isFinite(avg) ? avg : null,
       cost_basis_native: costNative,
       cost_basis_aud: costAud,
       target_allocation: h.target_allocation,
+      valid,
     };
   });
 
-  const totalAud = rows.reduce((sum, r) => sum + r.cost_basis_aud, 0);
+  const totalAud = rows.reduce((sum, r) => sum + (r.valid ? r.cost_basis_aud : 0), 0);
 
   // Second pass: allocation % + deviation now that the total is known.
   const withAllocation = rows.map((r) => {
+    if (!r.valid) return { ...r, actual_allocation_pct: null, deviation: null };
     const actual = totalAud > 0 ? round2((r.cost_basis_aud / totalAud) * 100) : 0;
     const target = Number(r.target_allocation);
     const deviation = round2(actual - (Number.isFinite(target) ? target : 0));

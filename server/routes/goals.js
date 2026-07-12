@@ -7,6 +7,7 @@ const router = express.Router();
 
 const VALID_DOMAINS = ['SMSF', 'MBS', 'Personal', 'Dev'];
 const VALID_STATUSES = ['active', 'completed', 'paused'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function getGoalWithAgents(id) {
   const db = getDb();
@@ -76,7 +77,13 @@ router.patch('/:id', asyncHandler((req, res) => {
     const { title, description, domain, target_date, progress, status } = req.body ?? {};
     if (domain  !== undefined && !VALID_DOMAINS.includes(domain))   return res.status(400).json({ error: `domain must be one of: ${VALID_DOMAINS.join(', ')}` });
     if (status  !== undefined && !VALID_STATUSES.includes(status))  return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
-    if (progress !== undefined && (progress < 0 || progress > 100)) return res.status(400).json({ error: 'progress must be 0–100' });
+    if (progress !== undefined && (!Number.isFinite(progress) || progress < 0 || progress > 100)) {
+      return res.status(400).json({ error: 'progress must be a number 0–100' });
+    }
+    if (title !== undefined && !title?.trim()) return res.status(400).json({ error: 'title cannot be empty' });
+    if (target_date != null && !DATE_RE.test(target_date)) {
+      return res.status(400).json({ error: 'target_date must be YYYY-MM-DD' });
+    }
 
     db.prepare(
       `UPDATE goals SET

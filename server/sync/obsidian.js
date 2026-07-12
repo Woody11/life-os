@@ -23,15 +23,23 @@ const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 // Markdown builders
 // ---------------------------------------------------------------------------
 
+// Quote a YAML front-matter scalar. JSON's double-quoted string escaping is a
+// valid subset of YAML's, so this safely handles colons, newlines, `---`,
+// and quotes in values that ultimately come from user-entered card/goal text
+// without pulling in a YAML library.
+function yamlScalar(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
 function buildKanbanCardNote(payload) {
   const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
   const domain = String(p.domain ?? '').toUpperCase();
   const lines = [
     `---`,
-    `domain: ${p.domain ?? ''}`,
-    `stage: ${p.stage ?? ''}`,
+    `domain: ${yamlScalar(p.domain)}`,
+    `stage: ${yamlScalar(p.stage)}`,
     `agent_pending: ${p.agent_pending ? 'true' : 'false'}`,
-    `updated: ${(p.updated_at ?? p.created_at ?? '').slice(0, 10)}`,
+    `updated: ${yamlScalar((p.updated_at ?? p.created_at ?? '').slice(0, 10))}`,
     `---`,
     ``,
     `# ${p.title ?? 'Untitled card'}`,
@@ -51,9 +59,9 @@ function buildDispatchNote(payload) {
   const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
   const lines = [
     `---`,
-    `agent: ${p.agent ?? ''}`,
-    `status: ${p.status ?? 'pending'}`,
-    `created: ${(p.created_at ?? '').slice(0, 10)}`,
+    `agent: ${yamlScalar(p.agent)}`,
+    `status: ${yamlScalar(p.status ?? 'pending')}`,
+    `created: ${yamlScalar((p.created_at ?? '').slice(0, 10))}`,
     `---`,
     ``,
     `# Dispatch #${p.id ?? '?'} — ${p.agent ?? 'Unknown'}`,

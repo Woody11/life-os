@@ -586,7 +586,8 @@ export default function KanbanTab() {
   async function handleDelete(cardId) {
     if (!confirm('Delete this card?')) return;
     try {
-      await fetch(`/api/kanban/${cardId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/kanban/${cardId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCards((prev) => prev.filter((c) => c.id !== cardId));
       setDetailCard(null);
     } catch {

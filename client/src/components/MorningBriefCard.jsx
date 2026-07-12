@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { todayAdelaide } from '../lib/adelaideDate';
 
 function isToday(isoStr) {
   if (!isoStr) return false;
   // Compare date portion only — brief's generated_at may include Adelaide offset
-  return isoStr.slice(0, 10) === new Date().toISOString().slice(0, 10);
+  return isoStr.slice(0, 10) === todayAdelaide();
 }
 
 function formatTime(isoStr) {

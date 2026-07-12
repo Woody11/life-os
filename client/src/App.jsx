@@ -8,6 +8,7 @@ import KanbanTab   from './tabs/KanbanTab.jsx';
 import HabitsTab   from './tabs/HabitsTab.jsx';
 import GoalsTab    from './tabs/GoalsTab.jsx';
 import { SseProvider } from './components/SseContext.jsx';
+import { todayAdelaide } from './lib/adelaideDate';
 
 const TABS = [
   { to: '/',         label: 'Home',     end: true },
@@ -124,6 +125,7 @@ function SearchOverlay({ open, onClose }) {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -146,20 +148,27 @@ function SearchOverlay({ open, onClose }) {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) {
+      abortRef.current?.abort();
       setResults(null);
       setLoading(false);
       return undefined;
     }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
+      // Abort any still-in-flight request for a prior query so a slow older
+      // response can't land after (and overwrite) a newer one's results.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
         const data = await res.json();
         setResults(Array.isArray(data) ? data : data.results || []);
-      } catch {
+      } catch (err) {
+        if (err.name === 'AbortError') return;
         setResults([]);
       } finally {
-        setLoading(false);
+        if (abortRef.current === controller) setLoading(false);
       }
     }, 300);
     return () => clearTimeout(debounceRef.current);
@@ -250,7 +259,7 @@ function useAlerts() {
         const habits = habitsData?.habits ?? (Array.isArray(habitsData) ? habitsData : []);
 
         const today = new Date();
-        const todayStr = today.toISOString().slice(0, 10);
+        const todayStr = todayAdelaide();
         const isPast8pm = today.getHours() >= 20;
 
         const next = [];

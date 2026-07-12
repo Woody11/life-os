@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Toast from '../components/Toast.jsx';
+import { todayAdelaide } from '../lib/adelaideDate';
 
 const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const HISTORY_WEEKS = 12;
@@ -63,7 +64,7 @@ function HistoryHeatmap({ habitId }) {
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayAdelaide();
   const { grid, weekMondays } = status === 'ready' ? buildHeatmapGrid(entries, today) : { grid: null, weekMondays: [] };
 
   return (
@@ -325,7 +326,7 @@ function StatsPanel({ habits }) {
     0,
   );
 
-  const referenceToday = habits[0]?.last_7_days?.slice(-1)[0]?.date ?? new Date().toISOString().slice(0, 10);
+  const referenceToday = habits[0]?.last_7_days?.slice(-1)[0]?.date ?? todayAdelaide();
   const currentMonth = referenceToday.slice(0, 7);
   const totalCompletionsThisMonth = habits.reduce(
     (sum, h) => sum + h.last_7_days.filter((d) => d.completed && d.date.slice(0, 7) === currentMonth).length,

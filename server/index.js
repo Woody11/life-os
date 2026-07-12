@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const path = require('node:path');
 const express = require('express');
+const helmet = require('helmet');
 const { initDb } = require('./db/init');
 const { addClient, removeClient } = require('./lib/sseEmitter');
 const statusRouter = require('./routes/status');
@@ -22,12 +23,25 @@ const { startObsidianSync } = require('./sync/obsidian');
 
 const PORT = process.env.PORT || 3030;
 
+// Warn (don't crash) on missing integration config — a dead DB is fatal, but
+// a missing upstream URL should just degrade that one dashboard card rather
+// than take the whole app down. This makes misconfiguration visible in logs
+// immediately instead of only when a user opens the affected tab.
+for (const key of ['WEALTHCANVAS_URL', 'LEGO_STUDIO_URL', 'OBSIDIAN_URL', 'OBSIDIAN_TOKEN', 'OPENCLAW_GATEWAY_URL', 'OPENCLAW_HOOK_TOKEN']) {
+  if (!process.env[key]) console.warn(`[life-os] ${key} is not set — related features will be degraded/disabled`);
+}
+
 // Initialise the database BEFORE wiring routes. If the schema can't be created
 // the process should crash immediately (fail fast) rather than serve a broken
 // app — a dead DB is unrecoverable at request time.
 initDb();
 
 const app = express();
+// CSP is left disabled: the built SPA hasn't been audited against a strict
+// policy, and a bad CSP silently breaks the whole app for a marginal LAN-only
+// benefit. The other Helmet defaults (frame/sniffing/referrer protection)
+// carry no such risk.
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json());
 
 // SSE stream — registered before the static handler (and before other API

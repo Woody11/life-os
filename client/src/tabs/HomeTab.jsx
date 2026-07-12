@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
 import { useSse } from '../components/SseContext.jsx';
+import { todayAdelaide } from '../lib/adelaideDate';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -251,7 +252,7 @@ export default function HomeTab() {
     kanbanInProgress: kanbanCards.filter((c) => !TERMINAL_KANBAN_STAGES.includes(c.stage)).length,
   }), [goals, habits, dispatches, kanbanCards]);
 
-  const todayStr = clock.toISOString().slice(0, 10);
+  const todayStr = todayAdelaide();
   const isPastEvening = clock.getHours() >= 20;
   const overdueGoals = useMemo(
     () => goals.filter((g) => g.status === 'active' && g.target_date && g.target_date < todayStr),

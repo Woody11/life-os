@@ -1,14 +1,24 @@
 const { getDb } = require('../db/init');
 
+const WAKE_TIMEOUT_MS = 5000;
+
 function wakeOpenClaw(text) {
   const url   = process.env.OPENCLAW_GATEWAY_URL;
   const token = process.env.OPENCLAW_HOOK_TOKEN;
-  if (!url || !token) return;
+  if (!url || !token) {
+    console.warn('[dispatchAgent] OPENCLAW_GATEWAY_URL or OPENCLAW_HOOK_TOKEN not set — dispatch created without waking OpenClaw');
+    return;
+  }
   fetch(`${url}/hooks/wake`, {
     method:  'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body:    JSON.stringify({ text, mode: 'now' }),
-  }).catch(() => {});
+    signal:  AbortSignal.timeout(WAKE_TIMEOUT_MS),
+  }).catch((err) => {
+    // Non-fatal: the dispatch row still exists and /api/dispatch/pending will
+    // pick it up eventually, but log so a stalled wake doesn't go unnoticed.
+    console.error('[dispatchAgent] wakeOpenClaw failed:', err.message ?? err);
+  });
 }
 
 // Insert a pending dispatch and wake Bazza. Returns the new dispatch row.

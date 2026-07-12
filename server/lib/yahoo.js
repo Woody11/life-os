@@ -105,15 +105,19 @@ async function gatherPrices(holdingsPayload) {
       const fx = usd ? USD_TO_AUD : 1;
       const qty = Number(h.total_quantity);
       const avg = Number(h.average_cost);
-      const costBasisAud = round2(qty * avg * fx);
+      // A non-numeric quantity/cost is left as a null cost basis (which is
+      // addition-safe) instead of NaN, which would otherwise poison every
+      // portfolio total it gets summed into.
+      const validCost = Number.isFinite(qty) && Number.isFinite(avg);
+      const costBasisAud = validCost ? round2(qty * avg * fx) : null;
 
       const meta = await fetchPriceMeta(h);
 
-      if (!meta) {
+      if (!meta || !validCost) {
         return {
           ticker: h.ticker,
-          price: null,
-          currency: h.currency,
+          price: meta ? round2(meta.price) : null,
+          currency: meta?.currency ?? h.currency,
           market_value_aud: null,
           cost_basis_aud: costBasisAud,
           pnl_aud: null,

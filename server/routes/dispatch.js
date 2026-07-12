@@ -39,21 +39,26 @@ router.get('/agents', (_req, res) => {
   res.json({ agents: AGENTS });
 });
 
+const MODELS = [
+  { id: '', label: 'Default (system)' },
+  { id: 'xai/grok-4.5', label: 'Grok 4.5' },
+  { id: 'xai/grok-4.3', label: 'Grok 4.3' },
+  { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+  { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+  { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+  { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5' },
+  { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8' },
+  { id: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { id: 'anthropic/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { id: 'xai/grok-4.20-beta-latest-reasoning', label: 'Grok 4.20 Reasoning' },
+];
+const MODEL_IDS = new Set(MODELS.map((m) => m.id));
+const AGENT_NAMES = new Set(AGENTS.map((a) => a.name));
+const MAX_PROMPT_LEN = 20_000;
+
 /** GET /api/dispatch/models — curated list of models available for dispatch */
 router.get('/models', (_req, res) => {
-  res.json({ models: [
-    { id: '', label: 'Default (system)' },
-    { id: 'xai/grok-4.5', label: 'Grok 4.5' },
-    { id: 'xai/grok-4.3', label: 'Grok 4.3' },
-    { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol' },
-    { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna' },
-    { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra' },
-    { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5' },
-    { id: 'anthropic/claude-opus-4-8', label: 'Claude Opus 4.8' },
-    { id: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { id: 'anthropic/claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
-    { id: 'xai/grok-4.20-beta-latest-reasoning', label: 'Grok 4.20 Reasoning' },
-  ]});
+  res.json({ models: MODELS });
 });
 
 /** GET /api/dispatch/agent-models — per-agent default model config */
@@ -71,6 +76,12 @@ router.put('/agent-models/:agentName', (req, res) => {
   const { model } = req.body ?? {};
   if (typeof model !== 'string' || !model.trim()) {
     return res.status(400).json({ error: 'model is required' });
+  }
+  if (!AGENT_NAMES.has(req.params.agentName)) {
+    return res.status(400).json({ error: `agentName must be one of: ${[...AGENT_NAMES].join(', ')}` });
+  }
+  if (!MODEL_IDS.has(model.trim())) {
+    return res.status(400).json({ error: `model must be one of: ${[...MODEL_IDS].filter(Boolean).join(', ')}` });
   }
 
   try {
@@ -142,11 +153,21 @@ router.get('/stats', (_req, res) => {
 });
 
 /** PATCH /api/dispatch/:id — update status + result (called by Bazza after agent completes) */
+const MAX_RESULT_LEN = 200_000;
+
 router.patch('/:id', (req, res) => {
   const { status, result, error: errMsg, input_tokens, output_tokens, cost_aud } = req.body ?? {};
   const allowed = ['running', 'review', 'done', 'error'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}` });
+  }
+  for (const [label, value] of [['input_tokens', input_tokens], ['output_tokens', output_tokens], ['cost_aud', cost_aud]]) {
+    if (value !== undefined && value !== null && (!Number.isFinite(value) || value < 0)) {
+      return res.status(400).json({ error: `${label} must be a non-negative number` });
+    }
+  }
+  if (typeof result === 'string' && result.length > MAX_RESULT_LEN) {
+    return res.status(400).json({ error: `result exceeds ${MAX_RESULT_LEN} characters` });
   }
 
   try {
@@ -200,6 +221,15 @@ router.post('/', (req, res) => {
 
   if (typeof agent !== 'string' || !agent.trim() || typeof prompt !== 'string' || !prompt.trim()) {
     return res.status(400).json({ error: 'agent and prompt are required' });
+  }
+  if (!AGENT_NAMES.has(agent.trim())) {
+    return res.status(400).json({ error: `agent must be one of: ${[...AGENT_NAMES].join(', ')}` });
+  }
+  if (prompt.length > MAX_PROMPT_LEN) {
+    return res.status(400).json({ error: `prompt exceeds ${MAX_PROMPT_LEN} characters` });
+  }
+  if (model !== undefined && model !== null && model !== '' && !MODEL_IDS.has(model.trim())) {
+    return res.status(400).json({ error: `model must be one of: ${[...MODEL_IDS].filter(Boolean).join(', ')}` });
   }
 
   try {
