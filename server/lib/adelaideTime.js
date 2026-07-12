@@ -25,19 +25,32 @@ function getAdelaideOffsetMs(date) {
   return asUtc(ADELAIDE_TZ) - asUtc('UTC');
 }
 
+// Offset (ms) Adelaide observes at local midnight of the given date. DST
+// transitions happen at 2am/3am local time, so the offset in effect at
+// midnight can't be read off directly — it's resolved with a fixed-point
+// step: guess using UTC-as-if-local, then re-read the offset at that
+// corrected instant. One iteration is sufficient since Adelaide's DST rules
+// only ever produce a single transition per calendar day.
+function offsetAtLocalMidnightMs(year, month, day) {
+  const guessMs = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const guessOffsetMs = getAdelaideOffsetMs(new Date(guessMs));
+  return getAdelaideOffsetMs(new Date(guessMs - guessOffsetMs));
+}
+
 // Returns UTC 'YYYY-MM-DD HH:MM:SS' bounds for a given Adelaide-local date
 // string, suitable for SQLite datetime comparisons (matches datetime('now')).
 function adelaideDayBounds(dateStr) {
   const [year, month, day] = dateStr.split('-').map(Number);
-  // Use midday on the target date to compute the offset — safely inside the
-  // date's own DST regime regardless of when the transition happens.
-  const middayUTC = new Date(Date.UTC(year, month - 1, day, 2, 30, 0));
-  const offsetMs = getAdelaideOffsetMs(middayUTC);
-  const startMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMs;
+  // Start and end offsets are resolved independently (rather than assuming
+  // the day is a fixed 24h span) because Adelaide has 23h/25h days at DST
+  // transitions.
+  const startMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offsetAtLocalMidnightMs(year, month, day);
+  const endMs = Date.UTC(year, month - 1, day + 1, 0, 0, 0) - offsetAtLocalMidnightMs(year, month, day + 1);
+
   const fmt = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
   return {
     start: fmt(startMs),
-    end: fmt(startMs + 24 * 60 * 60 * 1000),
+    end: fmt(endMs),
   };
 }
 

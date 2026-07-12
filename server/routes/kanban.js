@@ -2,6 +2,7 @@ const express = require('express');
 const { getDb } = require('../db/init');
 const { asyncHandler } = require('../lib/asyncHandler');
 const { emit } = require('../lib/sseEmitter');
+const { dispatchAgent } = require('../lib/dispatchAgent');
 
 const router = express.Router();
 
@@ -122,10 +123,11 @@ router.patch('/:id/stage', asyncHandler((req, res) => {
 
       if (agentName) {
         const prompt = buildAgentPrompt(card, stage, agentName);
-        const dispInfo = db
-          .prepare('INSERT INTO dispatches (agent, prompt, status) VALUES (?, ?, ?)')
-          .run(agentName, prompt, 'pending');
-        dispatchId = dispInfo.lastInsertRowid;
+        // dispatchAgent() wakes OpenClaw as a side effect — using it here (rather
+        // than inserting into `dispatches` directly) means Kanban-triggered
+        // dispatches actually notify the agent instead of waiting to be polled.
+        const dispatch = dispatchAgent(agentName, prompt);
+        dispatchId = dispatch.id;
 
         db.prepare('INSERT INTO kanban_stage_dispatches (card_id, stage, dispatch_id) VALUES (?, ?, ?)').run(
           card.id, stage, dispatchId,
