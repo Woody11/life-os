@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
+import { CloudLightning, Snowflake, CloudRain, CloudFog, Cloud, Sun, CloudSun, Thermometer } from 'lucide-react';
 
-const CONDITION_EMOJI = [
-  [/thunder|storm/i, '⛈'],
-  [/snow|sleet|blizzard/i, '❄️'],
-  [/rain|drizzle|shower/i, '🌧'],
-  [/fog|mist|haze/i, '🌫'],
-  [/cloud/i, '☁️'],
-  [/overcast/i, '☁️'],
-  [/clear|sunny/i, '☀️'],
-  [/partly/i, '⛅'],
+const CONDITION_ICON = [
+  [/thunder|storm/i, CloudLightning],
+  [/snow|sleet|blizzard/i, Snowflake],
+  [/rain|drizzle|shower/i, CloudRain],
+  [/fog|mist|haze/i, CloudFog],
+  [/cloud/i, Cloud],
+  [/overcast/i, Cloud],
+  [/clear|sunny/i, Sun],
+  [/partly/i, CloudSun],
 ];
 
-function conditionEmoji(cond) {
-  if (!cond) return '🌡';
-  for (const [re, emoji] of CONDITION_EMOJI) if (re.test(cond)) return emoji;
-  return '🌡';
+function conditionIcon(cond) {
+  if (!cond) return Thermometer;
+  for (const [re, Icon] of CONDITION_ICON) if (re.test(cond)) return Icon;
+  return Thermometer;
 }
 
 export default function WeatherCard() {
@@ -30,6 +31,8 @@ export default function WeatherCard() {
 
   if (error) return null;
 
+  const ConditionIcon = weather ? conditionIcon(weather.condition) : null;
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.03] p-6">
       <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">Weather</div>
@@ -38,7 +41,7 @@ export default function WeatherCard() {
       ) : (
         <>
           <div className="mt-3 flex items-end gap-3">
-            <span className="text-4xl">{conditionEmoji(weather.condition)}</span>
+            <ConditionIcon className="h-9 w-9 text-sky-300" />
             <span className="text-4xl font-bold tracking-tight text-white">{weather.tempC}°</span>
           </div>
           <div className="mt-1 text-xs text-slate-400">{weather.condition}</div>

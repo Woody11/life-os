@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { todayAdelaide } from '../lib/adelaideDate';
+import { Sun } from 'lucide-react';
 
 function isToday(isoStr) {
   if (!isoStr) return false;
@@ -43,7 +44,7 @@ export default function MorningBriefCard() {
         className="flex w-full items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <span className="text-lg">☀️</span>
+          <Sun className="h-5 w-5 text-amber-400" />
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-white">Morning Brief</span>

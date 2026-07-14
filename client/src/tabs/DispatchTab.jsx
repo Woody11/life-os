@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Toast from '../components/Toast.jsx';
 import { useSse } from '../components/SseContext.jsx';
+import { X, Settings } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Status styling
@@ -287,7 +288,7 @@ function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched, o
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -385,7 +386,7 @@ function DetailPanel({ dispatch, onClose }) {
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -479,7 +480,7 @@ function AgentModelsModal({ open, agents, onClose, onToast }) {
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -591,7 +592,7 @@ function TopBar({ stats, agentCount, clock, onNew, onAgentModels }) {
           onClick={onAgentModels}
           className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-white/[0.08]"
         >
-          ⚙ Agent Models
+          <span className="inline-flex items-center gap-1.5"><Settings className="h-4 w-4" /> Agent Models</span>
         </button>
         <button
           onClick={onNew}

@@ -11,6 +11,8 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import Toast from '../components/Toast.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import { Check } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Shared UI atoms
@@ -32,7 +34,7 @@ function SectionSpinner({ label = 'Loading…' }) {
 function ConfirmModal({ card, targetStage, agent, onConfirm, onCancel, loading }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1526] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-white">Dispatch {agent}?</h3>
         <p className="mt-3 text-sm text-slate-300">
           Moving{' '}
@@ -95,7 +97,7 @@ function AddCardModal({ domain, onAdd, onCancel }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1526] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-white">
           Add card — {domain.toUpperCase()}
         </h3>
@@ -193,7 +195,7 @@ function CardDetail({ card, onClose, onDelete, onUpdateCard, pipeline }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0d1526] shadow-2xl"
+        className="w-full max-w-lg rounded-2xl border border-white/10 bg-navy-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-white/[0.06] p-5">
@@ -226,7 +228,7 @@ function CardDetail({ card, onClose, onDelete, onUpdateCard, pipeline }) {
             <div className="mb-1 flex items-center gap-2">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Notes</p>
               {notesSaving && <span className="text-xs text-slate-500">Saving…</span>}
-              {!notesSaving && notesSaved && <span className="text-xs text-emerald-400">Saved ✓</span>}
+              {!notesSaving && notesSaved && <span className="inline-flex items-center gap-1 text-xs text-emerald-400">Saved <Check className="h-3 w-3" /></span>}
             </div>
             <textarea
               value={notes}
@@ -445,7 +447,7 @@ function KanbanCardTile({ card, pipeline, onClick, onMove, onDelete, isOverlay =
       </div>
 
       {menuOpen && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-xl border border-white/10 bg-[#0d1526] py-1 shadow-xl">
+        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-xl border border-white/10 bg-navy-900 py-1 shadow-xl">
           {pipeline.stages.map((s) => (
             <button
               key={s}
@@ -481,6 +483,7 @@ export default function KanbanTab() {
   const [detailCard, setDetailCard]         = useState(null);
   const [toast, setToast]                   = useState(null);
   const [activeCard, setActiveCard]         = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -583,8 +586,13 @@ export default function KanbanTab() {
     setAddDomain(null);
   }
 
-  async function handleDelete(cardId) {
-    if (!confirm('Delete this card?')) return;
+  function handleDelete(cardId) {
+    setDeleteConfirmId(cardId);
+  }
+
+  async function confirmDeleteCard() {
+    const cardId = deleteConfirmId;
+    setDeleteConfirmId(null);
     try {
       const res = await fetch(`/api/kanban/${cardId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -670,6 +678,14 @@ export default function KanbanTab() {
           domain={addDomain}
           onAdd={handleCardAdded}
           onCancel={() => setAddDomain(null)}
+        />
+      )}
+
+      {deleteConfirmId && (
+        <ConfirmDialog
+          title="Delete this card?"
+          onConfirm={confirmDeleteCard}
+          onCancel={() => setDeleteConfirmId(null)}
         />
       )}
 

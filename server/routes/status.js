@@ -31,6 +31,16 @@ const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 async function checkService(url, { agent, headers } = {}) {
   if (!url) return 'error';
 
+  // Node's fetch (undici) has no clean way to accept a plain https.Agent for
+  // TLS overrides (it wants a `dispatcher`), so when a custom agent is
+  // supplied (Obsidian's self-signed cert) we go straight to the raw https
+  // path instead of making a doomed fetch() attempt first — that attempt
+  // always failed with UNABLE_TO_VERIFY_LEAF_SIGNATURE and just doubled
+  // latency before falling through to this same fallback.
+  if (agent) {
+    return checkViaHttps(url, agent, headers);
+  }
+
   // AbortController enforces the timeout regardless of where fetch stalls
   // (DNS, connect, or waiting on the response).
   const controller = new AbortController();
@@ -41,21 +51,9 @@ async function checkService(url, { agent, headers } = {}) {
       method: 'GET',
       signal: controller.signal,
       headers,
-      // Node's fetch (undici) accepts a custom dispatcher for TLS overrides,
-      // but the simplest cross-version path for a self-signed cert is the
-      // https.Agent below via the `agent`-style option. undici uses `dispatcher`,
-      // so we fall back to a raw https request when an agent is supplied.
-      ...(agent ? {} : {}),
     });
     return 'ok';
   } catch {
-    // If fetch failed AND we have a custom agent (Obsidian/self-signed), retry
-    // via the raw https module which honours rejectUnauthorized:false reliably
-    // across Node versions.
-    if (agent) {
-      const viaHttps = await checkViaHttps(url, agent, headers);
-      return viaHttps;
-    }
     return 'error';
   } finally {
     clearTimeout(timer);

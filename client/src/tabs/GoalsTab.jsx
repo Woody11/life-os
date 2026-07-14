@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { RadialBarChart, RadialBar, Cell } from 'recharts';
 import Toast from '../components/Toast.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import { Check, X } from 'lucide-react';
 
 const DOMAIN_COLORS = {
   SMSF:     'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
@@ -87,7 +89,13 @@ function AgentDispatchButton({ goalId, agentRow, onDispatched }) {
           : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-indigo-500/30 hover:text-indigo-300 disabled:opacity-50'
       }`}
     >
-      {state === 'loading' ? '…' : state === 'done' ? `✓ ${agentRow.agent_name}` : agentRow.button_label}
+      {state === 'loading' ? (
+        '…'
+      ) : state === 'done' ? (
+        <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {agentRow.agent_name}</span>
+      ) : (
+        agentRow.button_label
+      )}
     </button>
   );
 }
@@ -95,6 +103,7 @@ function AgentDispatchButton({ goalId, agentRow, onDispatched }) {
 function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ agent_name: AGENTS[0], prompt_template: '', button_label: '', model: '' });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   async function patchProgress(progress) {
     const res = await fetch(`/api/goals/${goal.id}`, {
@@ -140,13 +149,18 @@ function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
   }
 
   function handleDelete() {
-    if (!confirm('Delete this goal?')) return;
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmDelete() {
+    setShowDeleteConfirm(false);
     onDelete(goal.id);
   }
 
   const domainCls = DOMAIN_COLORS[goal.domain] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 
   return (
+    <>
     <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -176,9 +190,9 @@ function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
           </select>
           <button
             onClick={handleDelete}
-            className="text-slate-700 hover:text-red-400 transition-colors text-xs"
+            className="text-slate-700 hover:text-red-400 transition-colors"
           >
-            ✕
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -191,7 +205,7 @@ function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
           {goal.agents?.map((a) => (
             <div key={a.id} className="flex items-center gap-1">
               <AgentDispatchButton goalId={goal.id} agentRow={a} onDispatched={handleDispatched} />
-              <button onClick={() => removeAgent(a.id)} className="text-[10px] text-slate-700 hover:text-red-400">✕</button>
+              <button onClick={() => removeAgent(a.id)} className="text-slate-700 hover:text-red-400"><X className="h-3 w-3" /></button>
             </div>
           ))}
         </div>
@@ -249,6 +263,14 @@ function GoalCard({ goal, onUpdate, onDelete, onToast, models }) {
         </button>
       )}
     </div>
+    {showDeleteConfirm && (
+      <ConfirmDialog
+        title="Delete this goal?"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+    )}
+    </>
   );
 }
 

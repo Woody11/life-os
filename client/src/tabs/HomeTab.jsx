@@ -4,6 +4,7 @@ import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { todayAdelaide } from '../lib/adelaideDate';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -308,7 +309,7 @@ export default function HomeTab() {
       {/* Overdue goal / missed habit banner */}
       {bannerItems.length > 0 && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-sm text-rose-300">
-          <span>⚠</span>
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>{bannerItems.join(' · ')}</span>
         </div>
       )}
@@ -352,7 +353,7 @@ export default function HomeTab() {
       {/* Partial data warning */}
       {data?.partial && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
-          <span>⚠</span>
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>Some upstream services are unavailable — data may be incomplete.</span>
         </div>
       )}
@@ -510,7 +511,7 @@ export default function HomeTab() {
               ) : !google?.emails ? (
                 <p className="text-sm text-slate-600">Email unavailable.</p>
               ) : google.emails.length === 0 ? (
-                <p className="text-sm text-slate-600">Inbox zero. 🎉</p>
+                <p className="flex items-center gap-1.5 text-sm text-slate-600"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Inbox zero.</p>
               ) : (
                 <div className="space-y-2">
                   {google.emails.map((em) => {

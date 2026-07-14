@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Toast from '../components/Toast.jsx';
 import { todayAdelaide } from '../lib/adelaideDate';
+import { Calendar, Flame, Check, Circle } from 'lucide-react';
 
 const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const HISTORY_WEEKS = 12;
@@ -73,7 +74,7 @@ function HistoryHeatmap({ habitId }) {
         onClick={toggleOpen}
         className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
       >
-        📅 History {open ? '▲' : '▼'}
+        <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> History {open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
@@ -195,7 +196,7 @@ function HabitCard({ habit, onToggle, onArchive, onToast }) {
             <div className="text-sm font-semibold text-white truncate">{habit.name}</div>
             <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
               {habit.current_streak > 0 && (
-                <span>🔥 {habit.current_streak} day{habit.current_streak !== 1 ? 's' : ''}</span>
+                <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-orange-400" /> {habit.current_streak} day{habit.current_streak !== 1 ? 's' : ''}</span>
               )}
             </div>
           </div>
@@ -203,13 +204,13 @@ function HabitCard({ habit, onToggle, onArchive, onToast }) {
         <button
           onClick={toggle}
           disabled={toggling}
-          className={`shrink-0 h-9 w-9 rounded-xl border text-lg transition-all ${
+          className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-xl border transition-all ${
             habit.completed_today
               ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400'
               : 'border-white/10 bg-white/[0.04] text-slate-600 hover:border-indigo-500/40 hover:text-indigo-400'
           }`}
         >
-          {habit.completed_today ? '✓' : '○'}
+          {habit.completed_today ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
         </button>
       </div>
 
@@ -340,7 +341,7 @@ function StatsPanel({ habits }) {
 
   return (
     <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <StatCard label="Best streak" value={`🔥 ${bestStreak}`} />
+      <StatCard label="Best streak" value={<span className="inline-flex items-center gap-1"><Flame className="h-4 w-4 text-orange-400" /> {bestStreak}</span>} />
       <StatCard label="Done this week" value={totalCompletionsThisWeek} />
       <StatCard label="Done this month" value={totalCompletionsThisMonth} />
       <StatCard label="Perfect days (week)" value={perfectDaysThisWeek} />
