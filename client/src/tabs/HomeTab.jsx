@@ -5,19 +5,11 @@ import MorningBriefCard from '../components/MorningBriefCard.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { todayAdelaide } from '../lib/adelaideDate';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { formatAud } from '../lib/format.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatAud(value) {
-  if (value == null || !Number.isFinite(Number(value))) return null;
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: 'AUD',
-    maximumFractionDigits: 0,
-  }).format(Number(value));
-}
 
 function formatPublishDate(iso) {
   if (!iso) return null;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import HomeTab     from './tabs/HomeTab.jsx';
 import SmsfTab     from './tabs/SmsfTab.jsx';
@@ -9,7 +9,7 @@ import HabitsTab   from './tabs/HabitsTab.jsx';
 import GoalsTab    from './tabs/GoalsTab.jsx';
 import { SseProvider } from './components/SseContext.jsx';
 import { todayAdelaide } from './lib/adelaideDate';
-import { Sun, Moon, Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle } from 'lucide-react';
+import { Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle } from 'lucide-react';
 
 const TABS = [
   { to: '/',         label: 'Home',     end: true },
@@ -20,34 +20,6 @@ const TABS = [
   { to: '/habits',   label: 'Habits' },
   { to: '/goals',    label: 'Goals' },
 ];
-
-const THEME_KEY = 'lifeos-theme';
-
-function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem(THEME_KEY) || 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
-
-  useEffect(() => {
-    document.body.classList.toggle('theme-light', theme === 'light');
-    document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {
-      /* ignore storage errors */
-    }
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-  }, []);
-
-  return [theme, toggleTheme];
-}
 
 const RESULT_ICONS = {
   dispatch: Send,
@@ -353,7 +325,7 @@ function MobileDrawer({ open, onClose }) {
   );
 }
 
-function NavBar({ theme, toggleTheme }) {
+function NavBar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -420,13 +392,6 @@ function NavBar({ theme, toggleTheme }) {
               <Search className="h-5 w-5" />
             </button>
             <NotificationBell />
-            <button
-              onClick={toggleTheme}
-              className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
           </div>
         </div>
       </nav>
@@ -438,13 +403,11 @@ function NavBar({ theme, toggleTheme }) {
 }
 
 export default function App() {
-  const [theme, toggleTheme] = useTheme();
-
   return (
     <HashRouter>
       <SseProvider>
         <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)]">
-          <NavBar theme={theme} toggleTheme={toggleTheme} />
+          <NavBar />
           <main>
             <Routes>
               <Route path="/"        element={<HomeTab />} />

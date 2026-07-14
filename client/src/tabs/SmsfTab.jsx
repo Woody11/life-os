@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Card, SectionSpinner, SectionError } from '../components/ui.jsx';
+import { formatAudPrecise as formatAud } from '../lib/format.js';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
-
-function formatAud(value) {
-  if (value == null || !Number.isFinite(Number(value))) return '—';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: 'AUD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(value));
-}
 
 function formatMoney(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—';
@@ -52,43 +44,6 @@ function deviationClass(deviation) {
   if (abs <= 2) return 'text-emerald-400';
   if (abs <= 5) return 'text-yellow-400';
   return 'text-red-400';
-}
-
-// ---------------------------------------------------------------------------
-// Shared UI atoms
-// ---------------------------------------------------------------------------
-
-function Card({ children, className = '' }) {
-  return (
-    <div className={`rounded-2xl border border-white/5 bg-white/[0.03] p-6 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function SectionSpinner({ label = 'Loading…' }) {
-  return (
-    <div className="flex items-center gap-3 py-8 text-slate-500">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
-      <span className="text-sm">{label}</span>
-    </div>
-  );
-}
-
-function SectionError({ message, onRetry }) {
-  return (
-    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
-      <div>{message || 'Something went wrong.'}</div>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
-        >
-          Retry
-        </button>
-      )}
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Toast from '../components/Toast.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { X, Settings } from 'lucide-react';
+import KanbanColumnShell from '../components/KanbanColumnShell.jsx';
 
 // ---------------------------------------------------------------------------
 // Status styling
@@ -151,24 +152,16 @@ function DispatchCard({ d, busyAgents, onOpen }) {
 
 function KanbanColumn({ col, items, busyAgents, onOpen }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2.5">
-        <span className={`text-xs font-semibold uppercase tracking-wider ${COLUMN_ACCENT[col.key]}`}>
-          {col.label}
-        </span>
-        <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-          {items.length}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-        {items.map((d) => (
-          <DispatchCard key={d.id} d={d} busyAgents={busyAgents} onOpen={onOpen} />
-        ))}
-        {items.length === 0 && (
-          <p className="px-1 py-3 text-center text-[11px] text-slate-700">—</p>
-        )}
-      </div>
-    </div>
+    <KanbanColumnShell
+      label={col.label}
+      labelClassName={COLUMN_ACCENT[col.key]}
+      count={items.length}
+      isEmpty={items.length === 0}
+    >
+      {items.map((d) => (
+        <DispatchCard key={d.id} d={d} busyAgents={busyAgents} onOpen={onOpen} />
+      ))}
+    </KanbanColumnShell>
   );
 }
 

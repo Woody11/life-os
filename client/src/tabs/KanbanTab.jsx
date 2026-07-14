@@ -12,20 +12,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import Toast from '../components/Toast.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import { SectionSpinner } from '../components/ui.jsx';
+import KanbanColumnShell from '../components/KanbanColumnShell.jsx';
 import { Check } from 'lucide-react';
-
-// ---------------------------------------------------------------------------
-// Shared UI atoms
-// ---------------------------------------------------------------------------
-
-function SectionSpinner({ label = 'Loading…' }) {
-  return (
-    <div className="flex items-center gap-3 py-8 text-slate-500">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
-      <span className="text-sm">{label}</span>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Confirmation modal — shown when moving a card to an agent-assigned stage
@@ -330,37 +319,25 @@ function KanbanColumn({ domain, stage, agentName, stageCards, pipeline, onCardCl
   });
 
   return (
-    <div className="w-48 min-w-48 shrink-0">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          {stage}
-        </span>
-        {agentName && (
-          <span className="text-xs text-indigo-400">{agentName}</span>
-        )}
-      </div>
-
-      <div
-        ref={setNodeRef}
-        className={`min-h-16 space-y-2 rounded-xl border p-2 transition-colors ${
-          isOver ? 'border-indigo-500/40 bg-indigo-500/[0.06]' : 'border-white/[0.04] bg-black/20'
-        }`}
-      >
-        {stageCards.map((card) => (
-          <KanbanCardTile
-            key={card.id}
-            card={card}
-            pipeline={pipeline}
-            onClick={() => onCardClick(card)}
-            onMove={(targetStage) => onMoveCard(card, targetStage)}
-            onDelete={onDeleteCard}
-          />
-        ))}
-        {stageCards.length === 0 && (
-          <p className="py-3 text-center text-xs text-slate-700">—</p>
-        )}
-      </div>
-    </div>
+    <KanbanColumnShell
+      label={stage}
+      accessory={agentName && <span className="text-xs text-indigo-400">{agentName}</span>}
+      width="w-48 min-w-48 shrink-0"
+      active={isOver}
+      bodyRef={setNodeRef}
+      isEmpty={stageCards.length === 0}
+    >
+      {stageCards.map((card) => (
+        <KanbanCardTile
+          key={card.id}
+          card={card}
+          pipeline={pipeline}
+          onClick={() => onCardClick(card)}
+          onMove={(targetStage) => onMoveCard(card, targetStage)}
+          onDelete={onDeleteCard}
+        />
+      ))}
+    </KanbanColumnShell>
   );
 }
 

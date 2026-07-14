@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Card, Spinner, ErrorBox } from '../components/ui.jsx';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -54,43 +55,6 @@ function StatusBadge({ status }) {
     <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>
       {status || 'unknown'}
     </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Shared UI atoms
-// ---------------------------------------------------------------------------
-
-function Card({ children, className = '' }) {
-  return (
-    <div className={`rounded-2xl border border-white/5 bg-white/[0.03] p-6 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function Spinner({ label = 'Loading…' }) {
-  return (
-    <div className="flex items-center gap-3 text-slate-500">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
-      <span className="text-sm">{label}</span>
-    </div>
-  );
-}
-
-function ErrorBox({ message, onRetry }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-red-300">
-      <span className="text-sm">{message || 'Something went wrong.'}</span>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
-        >
-          Retry
-        </button>
-      )}
-    </div>
   );
 }
 
