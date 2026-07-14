@@ -11,15 +11,25 @@ import { SseProvider } from './components/SseContext.jsx';
 import { todayAdelaide } from './lib/adelaideDate';
 import { Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle } from 'lucide-react';
 
-const TABS = [
-  { to: '/',         label: 'Home',     end: true },
-  { to: '/smsf',     label: 'SMSF' },
-  { to: '/mbs',      label: 'MBS' },
-  { to: '/dispatch', label: 'Dispatch' },
-  { to: '/kanban',   label: 'Kanban' },
-  { to: '/habits',   label: 'Habits' },
-  { to: '/goals',    label: 'Goals' },
+// Grouped so the nav communicates that Life OS absorbed several separate
+// apps into one dashboard, rather than reading as one flat list of tabs.
+const NAV_GROUPS = [
+  { label: null, tabs: [{ to: '/', label: 'Home', end: true }] },
+  { label: 'Mission Control', tabs: [
+    { to: '/dispatch', label: 'Dispatch' },
+    { to: '/kanban',   label: 'Kanban' },
+  ] },
+  { label: 'Portfolio & Studio', tabs: [
+    { to: '/smsf', label: 'SMSF' },
+    { to: '/mbs',  label: 'MBS' },
+  ] },
+  { label: 'Life', tabs: [
+    { to: '/habits', label: 'Habits' },
+    { to: '/goals',  label: 'Goals' },
+  ] },
 ];
+
+const TABS = NAV_GROUPS.flatMap((g) => g.tabs);
 
 const RESULT_ICONS = {
   dispatch: Send,
@@ -302,22 +312,31 @@ function MobileDrawer({ open, onClose }) {
           </button>
         </div>
         <div className="flex flex-col gap-1 p-3">
-          {TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                [
-                  'rounded-lg px-4 py-3 text-sm font-medium transition-colors duration-150',
-                  isActive
-                    ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-                ].join(' ')
-              }
-            >
-              {t.label}
-            </NavLink>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label ?? 'home'}>
+              {group.label && (
+                <p className="mb-1 mt-3 px-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-secondary)] first:mt-0">
+                  {group.label}
+                </p>
+              )}
+              {group.tabs.map((t) => (
+                <NavLink
+                  key={t.to}
+                  to={t.to}
+                  end={t.end}
+                  className={({ isActive }) =>
+                    [
+                      'block rounded-lg px-4 py-3 text-sm font-medium transition-colors duration-150',
+                      isActive
+                        ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+                    ].join(' ')
+                  }
+                >
+                  {t.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </div>
       </div>
@@ -352,30 +371,35 @@ function NavBar() {
 
           {/* Tabs (desktop) */}
           <div className="hidden md:flex flex-1 overflow-x-auto">
-            <div className="flex gap-1 min-w-max">
-              {TABS.map((t) => (
-                <NavLink
-                  key={t.to}
-                  to={t.to}
-                  end={t.end}
-                  className={({ isActive }) =>
-                    [
-                      'relative px-4 py-3.5 text-sm font-medium transition-colors duration-150',
-                      isActive
-                        ? 'text-[var(--text-primary)]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-                    ].join(' ')
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {t.label}
-                      {isActive && (
-                        <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
+            <div className="flex min-w-max items-center gap-1">
+              {NAV_GROUPS.map((group, gi) => (
+                <div key={group.label ?? 'home'} className="flex items-center gap-1">
+                  {gi > 0 && <span className="mx-2 h-5 w-px shrink-0 bg-[var(--border-color)]" />}
+                  {group.tabs.map((t) => (
+                    <NavLink
+                      key={t.to}
+                      to={t.to}
+                      end={t.end}
+                      className={({ isActive }) =>
+                        [
+                          'relative px-4 py-3.5 text-sm font-medium transition-colors duration-150',
+                          isActive
+                            ? 'text-[var(--text-primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+                        ].join(' ')
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {t.label}
+                          {isActive && (
+                            <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </NavLink>
+                    </NavLink>
+                  ))}
+                </div>
               ))}
             </div>
           </div>

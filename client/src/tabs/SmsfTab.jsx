@@ -148,7 +148,7 @@ function AllocationSection({ dividends }) {
 
       {state.status === 'ready' && (
         <>
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
@@ -207,6 +207,69 @@ function AllocationSection({ dividends }) {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 space-y-2 md:hidden">
+            {rows.map((h) => {
+              const p = prices.byTicker[h.ticker];
+              const liveAllocationPct =
+                hasLive && p?.market_value_aud != null && totals?.total_market_value_aud > 0
+                  ? Math.round((p.market_value_aud / totals.total_market_value_aud) * 10000) / 100
+                  : null;
+              const displayAllocationPct = liveAllocationPct ?? h.actual_allocation_pct;
+              const target = Number(h.target_allocation);
+              const displayDeviation = Number.isFinite(target)
+                ? Math.round((displayAllocationPct - target) * 100) / 100
+                : h.deviation;
+
+              return (
+                <div key={h.ticker} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold text-white">{h.ticker}</div>
+                      <div className="text-xs text-slate-400">{h.asset_class}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tabular-nums text-white">{formatAud(p?.market_value_aud)}</div>
+                      <div className={`text-xs font-medium tabular-nums ${pnlClass(p?.pnl_pct)}`}>
+                        {formatSignedAud(p?.pnl_aud)} ({formatSignedPct(p?.pnl_pct)})
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-1.5 text-xs">
+                    <div>
+                      <div className="text-slate-500">Shares</div>
+                      <div className="tabular-nums text-slate-300">{h.total_quantity}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Avg Cost</div>
+                      <div className="tabular-nums text-slate-300">{formatMoney(h.average_cost)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Price</div>
+                      <div className="tabular-nums text-slate-300">{formatMoney(p?.price)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Actual %</div>
+                      <div className="tabular-nums text-slate-300">{formatPct(displayAllocationPct)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Target %</div>
+                      <div className="tabular-nums text-slate-300">{formatPct(h.target_allocation)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Deviation</div>
+                      <div className={`tabular-nums font-medium ${deviationClass(displayDeviation)}`}>
+                        {formatSignedPct(displayDeviation)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {rows.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">No holdings.</p>
+            )}
           </div>
 
           <div className="mt-6 flex flex-wrap items-end gap-x-12 gap-y-5 border-t border-white/[0.06] pt-5">
@@ -287,52 +350,99 @@ function DividendSection({ dividendsState, onRetry }) {
       )}
 
       {state.status === 'ready' && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
-                <th className="py-2 pr-4 font-medium">Ticker</th>
-                <th className="py-2 pr-4 text-right font-medium">Shares</th>
-                <th className="py-2 pr-4 text-right font-medium">Annual Div/Share</th>
-                <th className="py-2 pr-4 text-right font-medium">Annual Total</th>
-                <th className="py-2 pr-4 font-medium">Ex-Div Date</th>
-                <th className="py-2 pr-4 font-medium">Pay Date</th>
-                <th className="py-2 font-medium">Next Report Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr
-                  key={d.ticker}
-                  className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
-                >
-                  <td className="py-2.5 pr-4 font-semibold text-white">{d.ticker}</td>
-                  <td className="py-2.5 pr-4 text-right tabular-nums text-slate-300">
-                    {d.total_quantity ?? '—'}
-                  </td>
-                  <td className="py-2.5 pr-4 text-right tabular-nums">
-                    {d.dividend_amount == null ? '—' : formatMoney(d.dividend_amount)}
-                  </td>
-                  <td className="py-2.5 pr-4 text-right tabular-nums text-emerald-400 font-medium">
-                    {d.dividend_amount != null && d.total_quantity != null
-                      ? formatAud(Math.round(d.dividend_amount * d.total_quantity * 100) / 100)
-                      : '—'}
-                  </td>
-                  <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.ex_div_date)}</td>
-                  <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.pay_date)}</td>
-                  <td className="py-2.5 text-slate-300">{formatDate(d.next_report_date)}</td>
+        <>
+          <div className="mt-4 hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
+                  <th className="py-2 pr-4 font-medium">Ticker</th>
+                  <th className="py-2 pr-4 text-right font-medium">Shares</th>
+                  <th className="py-2 pr-4 text-right font-medium">Annual Div/Share</th>
+                  <th className="py-2 pr-4 text-right font-medium">Annual Total</th>
+                  <th className="py-2 pr-4 font-medium">Ex-Div Date</th>
+                  <th className="py-2 pr-4 font-medium">Pay Date</th>
+                  <th className="py-2 font-medium">Next Report Date</th>
                 </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
-                    No dividend data.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((d) => (
+                  <tr
+                    key={d.ticker}
+                    className="border-b border-white/[0.04] text-slate-200 last:border-0 transition-colors hover:bg-white/[0.02]"
+                  >
+                    <td className="py-2.5 pr-4 font-semibold text-white">{d.ticker}</td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums text-slate-300">
+                      {d.total_quantity ?? '—'}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                      {d.dividend_amount == null ? '—' : formatMoney(d.dividend_amount)}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right tabular-nums text-emerald-400 font-medium">
+                      {d.dividend_amount != null && d.total_quantity != null
+                        ? formatAud(Math.round(d.dividend_amount * d.total_quantity * 100) / 100)
+                        : '—'}
+                    </td>
+                    <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.ex_div_date)}</td>
+                    <td className="py-2.5 pr-4 text-slate-300">{formatDate(d.pay_date)}</td>
+                    <td className="py-2.5 text-slate-300">{formatDate(d.next_report_date)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                      No dividend data.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 space-y-2 md:hidden">
+            {rows.map((d) => (
+              <div key={d.ticker} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <div className="flex items-start justify-between">
+                  <div className="font-semibold text-white">{d.ticker}</div>
+                  <div className="text-right">
+                    <div className="tabular-nums font-medium text-emerald-400">
+                      {d.dividend_amount != null && d.total_quantity != null
+                        ? formatAud(Math.round(d.dividend_amount * d.total_quantity * 100) / 100)
+                        : '—'}
+                    </div>
+                    <div className="text-xs text-slate-500">annual total</div>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <div>
+                    <div className="text-slate-500">Shares</div>
+                    <div className="tabular-nums text-slate-300">{d.total_quantity ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Annual Div/Share</div>
+                    <div className="tabular-nums text-slate-300">
+                      {d.dividend_amount == null ? '—' : formatMoney(d.dividend_amount)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Ex-Div Date</div>
+                    <div className="text-slate-300">{formatDate(d.ex_div_date)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Pay Date</div>
+                    <div className="text-slate-300">{formatDate(d.pay_date)}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-slate-500">Next Report Date</div>
+                    <div className="text-slate-300">{formatDate(d.next_report_date)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">No dividend data.</p>
+            )}
+          </div>
+        </>
       )}
     </Card>
   );
@@ -384,7 +494,7 @@ function TransactionSection() {
 
       {state.status === 'ready' && (
         <>
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-xs uppercase tracking-widest text-slate-500">
@@ -429,6 +539,42 @@ function TransactionSection() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 space-y-2 md:hidden">
+            {txns.map((t) => {
+              const isBuy = String(t.type).toUpperCase() === 'BUY';
+              return (
+                <div
+                  key={t.id}
+                  className={`rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 border-l-2 ${
+                    isBuy ? 'border-l-emerald-500' : 'border-l-red-500'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className={`text-xs font-medium uppercase ${isBuy ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {t.type}
+                      </span>
+                      <div className="font-semibold text-white">{t.ticker}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tabular-nums text-white">
+                        {formatMoney(t.total_amount)} <span className="text-xs text-slate-500">{t.currency}</span>
+                      </div>
+                      <div className="text-xs text-slate-500">{formatDate(t.date)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-4 text-xs">
+                    <span className="text-slate-500">Qty <span className="tabular-nums text-slate-300">{t.quantity}</span></span>
+                    <span className="text-slate-500">Price <span className="tabular-nums text-slate-300">{formatMoney(t.price_per_share)}</span></span>
+                  </div>
+                </div>
+              );
+            })}
+            {txns.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">No transactions.</p>
+            )}
           </div>
 
           {limit <= 20 && txns.length >= 20 && (

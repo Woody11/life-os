@@ -4,7 +4,7 @@ import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { todayAdelaide } from '../lib/adelaideDate';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatAud } from '../lib/format.js';
 
 // ---------------------------------------------------------------------------
@@ -149,6 +149,7 @@ export default function HomeTab() {
   const [habits, setHabits]       = useState([]);
   const [kanbanCards, setKanbanCards] = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const loadHome = useCallback(() => {
     setError(null);
@@ -534,11 +535,28 @@ export default function HomeTab() {
 
           {/* ── Recent activity ── */}
           <div className="mt-8">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Recent Activity</p>
+            <button
+              onClick={() => setActivityOpen((o) => !o)}
+              className="flex w-full items-center justify-between text-left"
+              disabled={recentActivity.length === 0}
+            >
+              <span className="text-xs font-semibold uppercase tracking-widest text-slate-600">Recent Activity</span>
+              {recentActivity.length > 0 && (
+                <span className="flex items-center gap-2 text-slate-600">
+                  {!activityOpen && (
+                    <span className="text-[10px] normal-case tracking-normal text-slate-500">
+                      {recentActivity.length} recent
+                    </span>
+                  )}
+                  {activityOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </span>
+              )}
+            </button>
+
             {recentActivity.length === 0 ? (
-              <p className="text-sm text-slate-600">No agent activity yet.</p>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-white/5">
+              <p className="mt-3 text-sm text-slate-600">No agent activity yet.</p>
+            ) : activityOpen && (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-white/5">
                 {recentActivity.map((d, i) => {
                   const summary = d.prompt && d.prompt.length > 80 ? d.prompt.slice(0, 80) + '…' : d.prompt;
                   const stamp = d.completed_at || d.created_at;
