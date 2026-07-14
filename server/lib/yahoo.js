@@ -9,7 +9,7 @@
 // All outbound requests send a browser-ish User-Agent to reduce 429s and carry a
 // hard per-request timeout so one slow ticker can't stall an aggregate response.
 
-const { USD_TO_AUD } = require('../config');
+const { getUsdToAud } = require('./fx');
 
 const UA = 'Mozilla/5.0';
 const YAHOO_TIMEOUT_MS = 5000;
@@ -90,19 +90,21 @@ async function fetchPriceMeta(holding) {
  * Enrich holdings with live prices and derived AUD figures.
  *
  * For each holding computes cost basis, market value, unrealised P&L (vs cost)
- * and today's P&L (vs previous close), all converted to AUD via the fixed FX
- * fallback for USD positions. Missing prices leave the live fields null.
+ * and today's P&L (vs previous close), all converted to AUD via the live (or
+ * fallback) FX rate for USD positions — see lib/fx.js. Missing prices leave
+ * the live fields null.
  *
  * Returns { rows, totals } where totals aggregate over priced holdings only
  * (so P&L% stays meaningful when a ticker is missing).
  */
 async function gatherPrices(holdingsPayload) {
   const holdings = holdingsPayload?.data ?? [];
+  const usdToAud = await getUsdToAud();
 
   const rows = await Promise.all(
     holdings.map(async (h) => {
       const usd = isUsd(h);
-      const fx = usd ? USD_TO_AUD : 1;
+      const fx = usd ? usdToAud : 1;
       const qty = Number(h.total_quantity);
       const avg = Number(h.average_cost);
       // A non-numeric quantity/cost is left as a null cost basis (which is

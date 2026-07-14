@@ -1,6 +1,6 @@
 const express = require('express');
-const { USD_TO_AUD } = require('../config');
 const { gatherPrices, gatherDividends } = require('../lib/yahoo');
+const { computeCostBasis, round2 } = require('../lib/portfolio');
 
 const router = express.Router();
 
@@ -56,51 +56,18 @@ router.get('/transactions', async (req, res) => {
 });
 
 /**
- * Round to 2 decimal places, guarding against FP drift.
- */
-function round2(n) {
-  return Math.round(n * 100) / 100;
-}
-
-/**
  * Compute allocation analysis from WealthCanvas holdings.
  *
- * For each holding: cost basis (native = qty × avg cost), converted to AUD with
- * the fixed fallback FX rate for US_* asset classes. Actual allocation % is the
- * holding's AUD cost basis over the portfolio total; deviation is actual minus
- * the holding's target_allocation.
+ * Cost basis (native and AUD, via the shared computeCostBasis) is the same
+ * calculation home.js's portfolio summary builds on — previously each route
+ * reimplemented it separately. This layers allocation % and deviation from
+ * target on top: actual allocation % is the holding's AUD cost basis over
+ * the portfolio total; deviation is actual minus the holding's
+ * target_allocation.
  */
-function computeSummary(holdingsPayload) {
-  const holdings = holdingsPayload?.data ?? [];
+async function computeSummary(holdingsPayload) {
+  const { rows, total_cost_basis_aud: totalAud } = await computeCostBasis(holdingsPayload);
 
-  // First pass: native + AUD cost basis, and the running portfolio total.
-  // A holding with a non-numeric quantity/cost is marked invalid and excluded
-  // from the total rather than propagating NaN — one malformed upstream
-  // record would otherwise poison the entire allocation summary.
-  const rows = holdings.map((h) => {
-    const qty = Number(h.total_quantity);
-    const avg = Number(h.average_cost);
-    const valid = Number.isFinite(qty) && Number.isFinite(avg);
-    const isUsd = String(h.asset_class).startsWith('US_');
-    const costNative = valid ? round2(qty * avg) : null;
-    const costAud = valid ? round2(costNative * (isUsd ? USD_TO_AUD : 1)) : null;
-    return {
-      ticker: h.ticker,
-      name: h.name,
-      asset_class: h.asset_class,
-      currency: h.currency,
-      total_quantity: Number.isFinite(qty) ? qty : null,
-      average_cost: Number.isFinite(avg) ? avg : null,
-      cost_basis_native: costNative,
-      cost_basis_aud: costAud,
-      target_allocation: h.target_allocation,
-      valid,
-    };
-  });
-
-  const totalAud = rows.reduce((sum, r) => sum + (r.valid ? r.cost_basis_aud : 0), 0);
-
-  // Second pass: allocation % + deviation now that the total is known.
   const withAllocation = rows.map((r) => {
     if (!r.valid) return { ...r, actual_allocation_pct: null, deviation: null };
     const actual = totalAud > 0 ? round2((r.cost_basis_aud / totalAud) * 100) : 0;
@@ -110,7 +77,7 @@ function computeSummary(holdingsPayload) {
   });
 
   return {
-    total_cost_basis_aud: round2(totalAud),
+    total_cost_basis_aud: totalAud,
     holdings: withAllocation,
     note: 'Allocation based on cost basis — live prices not configured',
   };
@@ -123,7 +90,7 @@ function computeSummary(holdingsPayload) {
 router.get('/summary', async (_req, res) => {
   try {
     const data = await fetchJson(`${process.env.WEALTHCANVAS_URL}/api/holdings`);
-    res.json(computeSummary(data));
+    res.json(await computeSummary(data));
   } catch {
     res.status(502).json({ error: 'WealthCanvas unavailable' });
   }

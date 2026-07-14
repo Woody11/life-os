@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb } = require('../db/init');
-const { USD_TO_AUD } = require('../config');
 const { gatherPrices } = require('../lib/yahoo');
+const { computeCostBasis } = require('../lib/portfolio');
 const { todayAdelaide, adelaideDayBounds } = require('../lib/adelaideTime');
 
 const router = express.Router();
@@ -22,21 +22,15 @@ async function fetchJson(url) {
 }
 
 /**
- * Compute total portfolio cost basis in AUD from WealthCanvas holdings.
- * cost basis = Σ (total_quantity × average_cost), with US_* asset classes
- * treated as USD and converted at the fixed fallback rate.
+ * Compute total portfolio cost basis in AUD from WealthCanvas holdings, via
+ * the same shared computeCostBasis smsf.js's allocation summary builds on
+ * — previously this route reimplemented the qty × avg_cost × FX math
+ * independently, which is exactly how the two could drift apart.
  */
-function computePortfolio(holdingsPayload) {
-  const holdings = holdingsPayload?.data ?? [];
-  let totalAud = 0;
-  for (const h of holdings) {
-    const cost = Number(h.total_quantity) * Number(h.average_cost);
-    if (!Number.isFinite(cost)) continue;
-    const inAud = String(h.asset_class).startsWith('US_') ? cost * USD_TO_AUD : cost;
-    totalAud += inAud;
-  }
+async function computePortfolio(holdingsPayload) {
+  const { total_cost_basis_aud } = await computeCostBasis(holdingsPayload);
   return {
-    total_cost_basis_aud: Math.round(totalAud * 100) / 100,
+    total_cost_basis_aud,
     total_market_value_aud: null,
     pnl_today_aud: null,
     pnl_today_pct: null,
@@ -120,7 +114,7 @@ router.get('/', async (_req, res) => {
 
   let portfolio = null;
   if (holdingsResult && !holdingsResult.__error) {
-    portfolio = computePortfolio(holdingsResult);
+    portfolio = await computePortfolio(holdingsResult);
     // Overlay live prices when available. A pricing failure is non-fatal — the
     // portfolio slice still returns cost basis; live fields simply stay null.
     try {
