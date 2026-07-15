@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card, Spinner, ErrorBox } from '../components/ui.jsx';
+import { Card, Skeleton, ErrorBox } from '../components/ui.jsx';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -110,7 +110,7 @@ function useFetch(url) {
 function PipelineBoard() {
   const { data, loading, error, reload } = useFetch('/api/mbs/pipeline');
 
-  if (loading) return <Card><Spinner label="Loading pipeline…" /></Card>;
+  if (loading) return <Card><Skeleton label="Loading pipeline…" /></Card>;
   if (error) return <ErrorBox message={`Pipeline: ${error}`} onRetry={reload} />;
 
   const pipeline = data?.pipeline || {};
@@ -256,7 +256,7 @@ function ScheduleDetail() {
   const { data, loading, error, reload } = useFetch('/api/mbs/schedule');
   const [openId, setOpenId] = useState(null);
 
-  if (loading) return <Card><Spinner label="Loading schedule…" /></Card>;
+  if (loading) return <Card><Skeleton label="Loading schedule…" /></Card>;
   if (error) return <ErrorBox message={`Schedule: ${error}`} onRetry={reload} />;
 
   const rows = (Array.isArray(data) ? [...data] : []).sort((a, b) =>
@@ -417,7 +417,7 @@ function QuickDispatch() {
       <SectionTitle>Quick Dispatch</SectionTitle>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {sets.loading ? (
-          <Card><Spinner label="Loading sets…" /></Card>
+          <Card><Skeleton label="Loading sets…" /></Card>
         ) : sets.error ? (
           <ErrorBox message={`Sets: ${sets.error}`} onRetry={sets.reload} />
         ) : (
@@ -432,7 +432,7 @@ function QuickDispatch() {
         )}
 
         {schedule.loading ? (
-          <Card><Spinner label="Loading schedule…" /></Card>
+          <Card><Skeleton label="Loading schedule…" /></Card>
         ) : schedule.error ? (
           <ErrorBox message={`Schedule: ${schedule.error}`} onRetry={schedule.reload} />
         ) : (

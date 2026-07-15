@@ -20,6 +20,20 @@
     color-scheme: dark;
   }
 
+  /* Visible keyboard focus ring, app-wide. Elements opt out of the browser's
+     default outline (via Tailwind's outline-none) for a cleaner look on
+     mouse click, but :focus-visible restores a real ring for keyboard
+     navigation so focus is never invisible. */
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  a[href]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.6);
+    outline-offset: 2px;
+  }
+
   /* Smooth scrollbar in dark theme */
   ::-webkit-scrollbar {
     width: 6px;

@@ -283,8 +283,8 @@ function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched, o
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[#0b0d12] shadow-2xl">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[var(--bg-surface)] shadow-2xl animate-slide-in-right">
         <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
           <h2 className="text-base font-semibold text-white">New Dispatch</h2>
           <button
@@ -378,8 +378,8 @@ function DetailPanel({ dispatch, onClose }) {
   const d = dispatch;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[#0b0d12] shadow-2xl">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[var(--bg-surface)] shadow-2xl animate-slide-in-right">
         <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold text-white">{d.agent}</span>
@@ -475,8 +475,8 @@ function AgentModelsModal({ open, agents, onClose, onToast }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-[#0b0d12] shadow-2xl">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-[var(--bg-surface)] shadow-2xl animate-scale-in">
         <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
           <h2 className="text-base font-semibold text-white">Agent Models</h2>
           <button

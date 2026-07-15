@@ -116,11 +116,11 @@ function SearchOverlay({ open, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/70 backdrop-blur-sm px-4 pt-24"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/70 backdrop-blur-sm px-4 pt-24 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-2xl"
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-[var(--border-color)] px-4 py-3">
@@ -348,6 +348,17 @@ function NavBar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <>
       <nav className="sticky top-0 z-50 border-b border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-app)_80%,transparent)] backdrop-blur-xl">
@@ -410,7 +421,17 @@ function NavBar() {
           <div className="flex items-center gap-1 py-2">
             <button
               onClick={() => setSearchOpen(true)}
-              className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="hidden md:flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+              <span className="rounded border border-[var(--border-color)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                ⌘K
+              </span>
+            </button>
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="flex md:hidden rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="Search"
             >
               <Search className="h-5 w-5" />

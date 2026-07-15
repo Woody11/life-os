@@ -12,7 +12,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import Toast from '../components/Toast.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { SectionSpinner } from '../components/ui.jsx';
+import { SectionSkeleton } from '../components/ui.jsx';
 import KanbanColumnShell from '../components/KanbanColumnShell.jsx';
 import { Check } from 'lucide-react';
 
@@ -587,7 +587,7 @@ export default function KanbanTab() {
           <p className="text-sm font-medium text-indigo-400">Boards</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Kanban</h1>
         </div>
-        <SectionSpinner label="Loading boards…" />
+        <SectionSkeleton label="Loading boards…" />
       </div>
     );
   }

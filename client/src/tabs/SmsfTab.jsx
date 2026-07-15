@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Card, SectionSpinner, SectionError } from '../components/ui.jsx';
+import { Card, SectionSkeleton, SectionError } from '../components/ui.jsx';
 import { formatAudPrecise as formatAud } from '../lib/format.js';
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ function AllocationSection({ dividends }) {
       <h2 className="text-lg font-semibold text-white">Allocation Overview</h2>
       <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
 
-      {state.status === 'loading' && <SectionSpinner label="Loading allocation…" />}
+      {state.status === 'loading' && <SectionSkeleton label="Loading allocation…" />}
 
       {state.status === 'error' && (
         <div className="mt-4">
@@ -338,7 +338,7 @@ function DividendSection({ dividendsState, onRetry }) {
         Ex-dividend, payment and next report dates per holding
       </p>
 
-      {state.status === 'loading' && <SectionSpinner label="Loading dividends…" />}
+      {state.status === 'loading' && <SectionSkeleton label="Loading dividends…" />}
 
       {state.status === 'error' && (
         <div className="mt-4">
@@ -481,7 +481,7 @@ function TransactionSection() {
     <Card>
       <h2 className="text-lg font-semibold text-white">Transaction History</h2>
 
-      {state.status === 'loading' && <SectionSpinner label="Loading transactions…" />}
+      {state.status === 'loading' && <SectionSkeleton label="Loading transactions…" />}
 
       {state.status === 'error' && (
         <div className="mt-4">

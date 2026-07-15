@@ -6,23 +6,25 @@ export function Card({ children, className = '' }) {
   );
 }
 
-// Bare spinner — no vertical padding. Use inside a Card or other container
-// that already provides its own spacing.
-export function Spinner({ label = 'Loading…' }) {
+// Bare skeleton — no vertical padding. Use inside a Card or other container
+// that already provides its own spacing. Pulsing placeholder bars read as
+// "content is arriving here" rather than a spinner's context-free wait.
+export function Skeleton({ label = 'Loading…' }) {
   return (
-    <div className="flex items-center gap-3 text-slate-500">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
-      <span className="text-sm">{label}</span>
+    <div className="space-y-2.5" role="status" aria-label={label}>
+      <div className="h-4 w-5/6 animate-pulse rounded bg-white/5" />
+      <div className="h-4 w-2/3 animate-pulse rounded bg-white/5" />
+      <div className="h-4 w-1/2 animate-pulse rounded bg-white/5" />
     </div>
   );
 }
 
-// Padded spinner for standalone use directly inside a section (not wrapped
+// Padded skeleton for standalone use directly inside a section (not wrapped
 // in a Card).
-export function SectionSpinner({ label = 'Loading…' }) {
+export function SectionSkeleton({ label = 'Loading…' }) {
   return (
     <div className="py-8">
-      <Spinner label={label} />
+      <Skeleton label={label} />
     </div>
   );
 }
