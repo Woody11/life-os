@@ -637,7 +637,7 @@ export default function KanbanTab() {
         </DragOverlay>
       </DndContext>
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast} type="error" onClose={() => setToast(null)} />
 
       {confirmPending && (
         <ConfirmModal

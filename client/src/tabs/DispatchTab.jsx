@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Toast from '../components/Toast.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { X, Settings } from 'lucide-react';
@@ -225,12 +225,22 @@ function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched, o
   const [models, setModels]         = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback]     = useState(null);
+  const initializedRef = useRef(false);
 
+  // Initialize the agent field once per open cycle, not on every render —
+  // including `agent` in this effect's own deps (as it used to) meant every
+  // manual dropdown selection re-triggered the effect and snapped the value
+  // straight back to initialAgent.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     if (initialAgent) setAgent(initialAgent);
-    else if (agents.length && !agent) setAgent(agents[0].name);
-  }, [open, initialAgent, agents, agent]);
+    else if (agents.length) setAgent(agents[0].name);
+  }, [open, initialAgent, agents]);
 
   useEffect(() => {
     if (!open) return;
@@ -257,11 +267,11 @@ function NewDispatchPanel({ open, agents, initialAgent, onClose, onDispatched, o
       setModel('');
       setFeedback(null);
       onDispatched?.();
-      onToast?.(`Dispatched to ${agent}`);
+      onToast?.(`Dispatched to ${agent}`, 'success');
       onClose();
     } catch (err) {
       setFeedback({ type: 'error', text: `Dispatch failed: ${err.message}` });
-      onToast?.('Send failed — please try again');
+      onToast?.('Send failed — please try again', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -439,7 +449,7 @@ function AgentModelsModal({ open, agents, onClose, onToast }) {
         for (const row of amJson.agentModels ?? []) map[row.agent_name] = row.model;
         setAgentModels(map);
       })
-      .catch((err) => onToast?.(`Failed to load agent models: ${err.message}`))
+      .catch((err) => onToast?.(`Failed to load agent models: ${err.message}`, 'error'))
       .finally(() => setLoading(false));
   }, [open, onToast]);
 
@@ -453,9 +463,9 @@ function AgentModelsModal({ open, agents, onClose, onToast }) {
         body: JSON.stringify({ model: newModel }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      onToast?.(`Default model updated for ${agentName}`);
+      onToast?.(`Default model updated for ${agentName}`, 'success');
     } catch (err) {
-      onToast?.(`Failed to update ${agentName}: ${err.message}`);
+      onToast?.(`Failed to update ${agentName}: ${err.message}`, 'error');
     } finally {
       setSavingAgent(null);
     }
@@ -613,6 +623,7 @@ export default function DispatchTab() {
   const [pickedAgent, setPickedAgent] = useState('');
   const [detail, setDetail]           = useState(null);
   const [toast, setToast]             = useState(null);
+  const showToast = useCallback((message, type = 'success') => setToast({ message, type }), []);
   const [agentModelsOpen, setAgentModelsOpen] = useState(false);
 
   const [agentFilter, setAgentFilter] = useState('');
@@ -704,7 +715,7 @@ export default function DispatchTab() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] flex-col">
+    <div className="flex min-h-[calc(100vh-64px)] flex-col">
       <TopBar
         stats={stats}
         agentCount={agents.length}
@@ -761,7 +772,7 @@ export default function DispatchTab() {
         initialAgent={pickedAgent}
         onClose={() => setPanelOpen(false)}
         onDispatched={() => load(new AbortController().signal)}
-        onToast={setToast}
+        onToast={showToast}
       />
 
       <DetailPanel dispatch={detail} onClose={() => setDetail(null)} />
@@ -770,10 +781,10 @@ export default function DispatchTab() {
         open={agentModelsOpen}
         agents={agents}
         onClose={() => setAgentModelsOpen(false)}
-        onToast={setToast}
+        onToast={showToast}
       />
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
     </div>
   );
 }

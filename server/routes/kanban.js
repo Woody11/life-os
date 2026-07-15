@@ -190,9 +190,22 @@ function buildAgentPrompt(card, stage, agent) {
   return prompts[agent] ?? `Task for ${agent}: "${card.title}" has moved to the ${stage} stage. Please action this for ${domainLabel}.`;
 }
 
+// Card titles are free-text user input and end up as a filename inside the
+// Obsidian vault. Strip path separators and other filesystem-unsafe
+// characters so a title can't escape the intended folder (e.g. "../../x")
+// or otherwise produce an unexpected nested/invalid path.
+function sanitizeForFilename(value) {
+  const cleaned = String(value ?? '')
+    .replace(/[\/\\]/g, '-')
+    .replace(/[<>:"|?*\x00-\x1f]/g, '')
+    .trim()
+    .slice(0, 150);
+  return cleaned || 'Untitled';
+}
+
 function queueObsidianSync(db, entityType, entityId, payload) {
   const vaultPath = entityType === 'kanban_card'
-    ? `60 Agent System/Kanban/${payload.domain?.toUpperCase() ?? 'CARD'} — ${payload.title ?? entityId}.md`
+    ? `60 Agent System/Kanban/${payload.domain?.toUpperCase() ?? 'CARD'} — ${sanitizeForFilename(payload.title ?? entityId)}.md`
     : `60 Agent System/Dispatches/${entityId}.md`;
   try {
     db.prepare(

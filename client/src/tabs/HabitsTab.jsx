@@ -423,7 +423,7 @@ export default function HabitsTab() {
         </div>
       )}
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast} type="error" onClose={() => setToast(null)} />
     </div>
   );
 }

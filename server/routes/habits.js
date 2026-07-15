@@ -104,12 +104,15 @@ router.post('/', (req, res) => {
 // PATCH /api/habits/:id
 router.patch('/:id', (req, res) => {
   const { name, emoji, active } = req.body ?? {};
+  if (name !== undefined && !name?.trim()) {
+    return res.status(400).json({ error: 'name cannot be empty' });
+  }
   try {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Not found' });
     db.prepare('UPDATE habits SET name = ?, emoji = ?, active = ? WHERE id = ?').run(
-      name  ?? existing.name,
+      name?.trim() ?? existing.name,
       emoji !== undefined ? emoji : existing.emoji,
       active !== undefined ? (active ? 1 : 0) : existing.active,
       req.params.id,

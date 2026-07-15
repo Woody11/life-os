@@ -3,6 +3,7 @@ import { RadialBarChart, RadialBar, Cell } from 'recharts';
 import Toast from '../components/Toast.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { Check, X } from 'lucide-react';
+import { todayAdelaide } from '../lib/adelaideDate';
 
 const DOMAIN_COLORS = {
   SMSF:     'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
@@ -351,7 +352,7 @@ const FILTER_TABS = ['all', 'active', 'completed', 'paused'];
 const DOMAIN_FILTERS = ['all', ...DOMAINS];
 
 function GoalsStats({ goals }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayAdelaide();
   const monthPrefix = today.slice(0, 7);
 
   const active = goals.filter((g) => g.status === 'active');
@@ -483,7 +484,7 @@ export default function GoalsTab() {
         </div>
       )}
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast} type="success" onClose={() => setToast(null)} />
     </div>
   );
 }
