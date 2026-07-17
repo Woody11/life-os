@@ -286,23 +286,43 @@ async function fetchDividend(holding) {
 
     const sd = result.summaryDetail ?? {};
     const ks = result.defaultKeyStatistics ?? {};
-    const earnings = result.calendarEvents?.earnings ?? {};
+    const calendarEvents = result.calendarEvents ?? {};
+    const earnings = calendarEvents.earnings ?? {};
     const nextReport = Array.isArray(earnings.earningsDate)
       ? earnings.earningsDate[0]?.raw
       : null;
 
-    // Yahoo's summaryDetail.dividendDate is unreliable for non-US stocks;
-    // fall back to defaultKeyStatistics.lastDividendDate when it's missing.
+    const exDivIso = unixToIsoDate(sd.exDividendDate?.raw);
+
+    // A real pay date always falls strictly after its ex-dividend date.
+    // Verified live against Yahoo: defaultKeyStatistics.lastDividendDate
+    // (the old fallback) actually equals exDividendDate for every US
+    // ticker checked — it's the *ex-div* date under a misleading name, not
+    // a pay date, which is why pay_date and ex_div_date were showing up
+    // identical (or, for tickers where lastDividendDate was stale from a
+    // prior cycle, pay_date before ex_div_date). calendarEvents.dividendDate
+    // — already fetched for earnings but otherwise unused — is the field
+    // that reliably lands after ex-div, so it's tried first. The "after
+    // ex-div" guard stays on every candidate as a safety net against
+    // further Yahoo mislabeling.
+    function validPayDate(candidateSecs) {
+      const iso = unixToIsoDate(candidateSecs);
+      if (!iso) return null;
+      if (exDivIso && iso <= exDivIso) return null;
+      return iso;
+    }
+
     const payDate =
-      unixToIsoDate(sd.dividendDate?.raw) ??
-      unixToIsoDate(ks.lastDividendDate?.raw);
+      validPayDate(calendarEvents.dividendDate?.raw) ??
+      validPayDate(sd.dividendDate?.raw) ??
+      validPayDate(ks.lastDividendDate?.raw);
 
     return {
       ticker: holding.ticker,
       dividend_amount: Number.isFinite(Number(sd.dividendRate?.raw))
         ? Number(sd.dividendRate.raw)
         : null,
-      ex_div_date: unixToIsoDate(sd.exDividendDate?.raw),
+      ex_div_date: exDivIso,
       pay_date: payDate,
       next_report_date: unixToIsoDate(nextReport),
     };
