@@ -51,4 +51,65 @@ router.get('/', (_req, res) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Gmail actions — thin proxy to google-sync/action-api.js (a separate
+// service on the Mac mini that holds the actual Gmail OAuth clients). Kept
+// server-side so the bearer token never reaches the browser. Read-only cache
+// above is unaffected by these — archiving/reading a message here doesn't
+// touch the cached list; the frontend removes it from its own local state.
+// ---------------------------------------------------------------------------
+
+async function actionsFetch(path, body) {
+  if (!process.env.GOOGLE_ACTIONS_URL || !process.env.GOOGLE_ACTIONS_TOKEN) {
+    throw Object.assign(new Error('Gmail actions are not configured'), { status: 503 });
+  }
+  const res = await fetch(`${process.env.GOOGLE_ACTIONS_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GOOGLE_ACTIONS_TOKEN}`,
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status });
+  return data;
+}
+
+async function handleAction(req, res, path, body) {
+  try {
+    res.json(await actionsFetch(path, body));
+  } catch (e) {
+    res.status(e.status || 502).json({ error: e.message });
+  }
+}
+
+// POST /api/google/gmail/:accountEmail/messages/:id/archive
+router.post('/gmail/:accountEmail/messages/:id/archive', (req, res) =>
+  handleAction(
+    req, res,
+    `/gmail/${encodeURIComponent(req.params.accountEmail)}/messages/${encodeURIComponent(req.params.id)}/archive`
+  )
+);
+
+// POST /api/google/gmail/:accountEmail/messages/:id/read
+router.post('/gmail/:accountEmail/messages/:id/read', (req, res) =>
+  handleAction(
+    req, res,
+    `/gmail/${encodeURIComponent(req.params.accountEmail)}/messages/${encodeURIComponent(req.params.id)}/read`
+  )
+);
+
+// POST /api/google/gmail/:accountEmail/drafts — creates a Gmail draft, never
+// sends. { replyToMessageId, body } threads it as a reply (to/subject are
+// auto-derived from the original message by action-api.js).
+router.post('/gmail/:accountEmail/drafts', (req, res) => {
+  const { replyToMessageId, to, subject, body } = req.body ?? {};
+  return handleAction(
+    req, res,
+    `/gmail/${encodeURIComponent(req.params.accountEmail)}/drafts`,
+    { replyToMessageId, to, subject, body }
+  );
+});
+
 module.exports = router;

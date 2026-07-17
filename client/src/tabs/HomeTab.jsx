@@ -4,7 +4,7 @@ import WeatherCard from '../components/WeatherCard.jsx';
 import MorningBriefCard from '../components/MorningBriefCard.jsx';
 import { useSse } from '../components/SseContext.jsx';
 import { todayAdelaide } from '../lib/adelaideDate';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Archive, MailOpen, Reply, Send } from 'lucide-react';
 import { formatAud } from '../lib/format.js';
 
 // ---------------------------------------------------------------------------
@@ -145,6 +145,9 @@ export default function HomeTab() {
   const [dispatches, setDispatches] = useState([]);
   const [google, setGoogle]       = useState(null);
   const [googleLoading, setGoogleLoading] = useState(true);
+  const [emailActionState, setEmailActionState] = useState({}); // { [id]: 'archiving' | 'reading' | 'replying' | 'sent' | 'error' }
+  const [replyOpenId, setReplyOpenId] = useState(null);
+  const [replyText, setReplyText] = useState('');
   const [goals, setGoals]         = useState([]);
   const [habits, setHabits]       = useState([]);
   const [kanbanCards, setKanbanCards] = useState([]);
@@ -222,6 +225,74 @@ export default function HomeTab() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Gmail actions proxy through the server (server/routes/google.js) to
+  // google-sync/action-api.js, which holds the real OAuth clients. The
+  // cached email list only refreshes via the daily sync cron, so a
+  // successful archive/read is reflected by removing the row from local
+  // state directly rather than refetching — refetching wouldn't show the
+  // change until tomorrow's sync anyway.
+  const removeEmailLocally = useCallback((id) => {
+    setGoogle((prev) => prev && {
+      ...prev,
+      emails: (prev.emails ?? []).filter((e) => e.id !== id),
+    });
+  }, []);
+
+  const archiveEmail = useCallback(async (em) => {
+    setEmailActionState((s) => ({ ...s, [em.id]: 'archiving' }));
+    try {
+      const res = await fetch(`/api/google/gmail/${encodeURIComponent(em.account)}/messages/${encodeURIComponent(em.id)}/archive`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error();
+      removeEmailLocally(em.id);
+    } catch {
+      setEmailActionState((s) => ({ ...s, [em.id]: 'error' }));
+    }
+  }, [removeEmailLocally]);
+
+  const markEmailRead = useCallback(async (em) => {
+    setEmailActionState((s) => ({ ...s, [em.id]: 'reading' }));
+    try {
+      const res = await fetch(`/api/google/gmail/${encodeURIComponent(em.account)}/messages/${encodeURIComponent(em.id)}/read`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error();
+      setGoogle((prev) => prev && {
+        ...prev,
+        emails: (prev.emails ?? []).map((e) =>
+          e.id === em.id ? { ...e, labels: (e.labels ?? []).filter((l) => l !== 'UNREAD') } : e
+        ),
+      });
+      setEmailActionState((s) => { const { [em.id]: _drop, ...rest } = s; return rest; });
+    } catch {
+      setEmailActionState((s) => ({ ...s, [em.id]: 'error' }));
+    }
+  }, []);
+
+  const toggleReply = useCallback((id) => {
+    setReplyOpenId((open) => (open === id ? null : id));
+    setReplyText('');
+  }, []);
+
+  const sendReplyDraft = useCallback(async (em) => {
+    if (!replyText.trim()) return;
+    setEmailActionState((s) => ({ ...s, [em.id]: 'replying' }));
+    try {
+      const res = await fetch(`/api/google/gmail/${encodeURIComponent(em.account)}/drafts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyToMessageId: em.id, body: replyText }),
+      });
+      if (!res.ok) throw new Error();
+      setEmailActionState((s) => ({ ...s, [em.id]: 'sent' }));
+      setReplyOpenId(null);
+      setReplyText('');
+    } catch {
+      setEmailActionState((s) => ({ ...s, [em.id]: 'error' }));
+    }
+  }, [replyText]);
 
   // Real-time updates via shared SSE connection.
   const { subscribe } = useSse();
@@ -510,6 +581,9 @@ export default function HomeTab() {
                   {google.emails.map((em) => {
                     const badge = categoryBadge(em.labels);
                     const unread = em.labels?.includes('UNREAD');
+                    const state = emailActionState[em.id];
+                    const busy = state === 'archiving' || state === 'reading' || state === 'replying';
+                    const replying = replyOpenId === em.id;
                     return (
                       <div key={em.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -524,7 +598,71 @@ export default function HomeTab() {
                           )}
                         </div>
                         <div className="mt-1 truncate text-sm text-white">{em.subject}</div>
-                        <div className="mt-0.5 text-[10px] text-slate-600">{em.date}</div>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-600">{em.date}</span>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            {state === 'error' && (
+                              <span className="mr-1 text-[10px] text-red-400">Failed</span>
+                            )}
+                            {state === 'sent' && (
+                              <span className="mr-1 flex items-center gap-1 text-[10px] text-emerald-400">
+                                <CheckCircle2 className="h-3 w-3" /> Draft saved
+                              </span>
+                            )}
+                            {unread && (
+                              <button
+                                type="button"
+                                onClick={() => markEmailRead(em)}
+                                disabled={busy}
+                                title="Mark as read"
+                                className="rounded-md p-1 text-slate-500 hover:bg-white/5 hover:text-slate-300 disabled:opacity-40"
+                              >
+                                <MailOpen className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleReply(em.id)}
+                              disabled={busy}
+                              title="Reply"
+                              className={`rounded-md p-1 hover:bg-white/5 disabled:opacity-40 ${replying ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                              <Reply className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => archiveEmail(em)}
+                              disabled={busy}
+                              title="Archive"
+                              className="rounded-md p-1 text-slate-500 hover:bg-white/5 hover:text-slate-300 disabled:opacity-40"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        {replying && (
+                          <div className="mt-2 space-y-1.5 border-t border-white/5 pt-2">
+                            <textarea
+                              autoFocus
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Write a reply…"
+                              rows={2}
+                              className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"
+                            />
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-600">Saves as a Gmail draft — never sent automatically.</span>
+                              <button
+                                type="button"
+                                onClick={() => sendReplyDraft(em)}
+                                disabled={state === 'replying' || !replyText.trim()}
+                                className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-500/20 px-2 py-1 text-[10px] font-medium text-indigo-300 hover:bg-indigo-500/30 disabled:opacity-40"
+                              >
+                                <Send className="h-3 w-3" /> Save Draft
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
