@@ -87,6 +87,70 @@ async function fetchPriceMeta(holding) {
 }
 
 /**
+ * Fetch actual paid-dividend history for one symbol from the chart
+ * endpoint's `events=div` extension. Needs no crumb/cookie (same as
+ * fetchPriceMeta), and reflects real payouts rather than a forward-declared
+ * rate — the fallback of last resort for tickers where quoteSummary's
+ * summaryDetail (dividendRate, exDividendDate) comes back empty, which is
+ * the normal case for ASX tickers (verified live: CBA.AX/NAB.AX return `{}`
+ * for both fields via quoteSummary, but this endpoint has 2 years of real
+ * payout history for both).
+ *
+ * Returns { annualDividend, lastExDivDate }, both null if there's no
+ * history. annualDividend sums the most recent N payouts, where N is the
+ * payment frequency inferred from the median gap between consecutive
+ * historical payouts (rounded to the nearest of annual/semi-annual/
+ * quarterly/monthly) — correctly handling uneven interim/final splits (e.g.
+ * CBA's last two payments were $2.60 then $2.35, not equal halves, so a
+ * "double the last payment" guess would be wrong). A fixed 365-day lookback
+ * window was tried first but rejected: consecutive semi-annual payments
+ * often land just under 6 months apart, so a strict trailing year can catch
+ * 3 payments instead of 2 and overstate the annual figure by ~50% — inferring
+ * the actual cadence and taking exactly that many payments avoids that.
+ * lastExDivDate is the most recent event's date: despite its Yahoo field
+ * name implying a payment date, cross-checking the equivalent field against
+ * US tickers' separately-reported exDividendDate shows it's actually the
+ * ex-dividend date, so it's surfaced as ex_div_date, not pay_date.
+ */
+async function fetchDividendHistory(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=2y&interval=1d&events=div`;
+  try {
+    const res = await fetchWithTimeout(url);
+    const json = await res.json();
+    const events = json?.chart?.result?.[0]?.events?.dividends;
+    if (!events) return { annualDividend: null, lastExDivDate: null };
+
+    const entries = Object.values(events)
+      .filter((e) => Number.isFinite(Number(e?.amount)) && Number.isFinite(Number(e?.date)))
+      .sort((a, b) => a.date - b.date);
+    if (entries.length === 0) return { annualDividend: null, lastExDivDate: null };
+
+    const last = entries[entries.length - 1];
+
+    let paymentsPerYear = 1;
+    if (entries.length >= 2) {
+      const gapsDays = [];
+      for (let i = 1; i < entries.length; i += 1) {
+        gapsDays.push((entries[i].date - entries[i - 1].date) / 86400);
+      }
+      gapsDays.sort((a, b) => a - b);
+      const medianGap = gapsDays[Math.floor(gapsDays.length / 2)];
+      paymentsPerYear = [1, 2, 4, 12].reduce((best, freq) =>
+        Math.abs(365 / freq - medianGap) < Math.abs(365 / best - medianGap) ? freq : best
+      );
+    }
+
+    const trailing = entries.slice(-paymentsPerYear);
+    return {
+      annualDividend: round2(trailing.reduce((sum, e) => sum + Number(e.amount), 0)),
+      lastExDivDate: unixToIsoDate(last.date),
+    };
+  } catch {
+    return { annualDividend: null, lastExDivDate: null };
+  }
+}
+
+/**
  * Enrich holdings with live prices and derived AUD figures.
  *
  * For each holding computes cost basis, market value, unrealised P&L (vs cost)
@@ -292,7 +356,16 @@ async function fetchDividend(holding) {
       ? earnings.earningsDate[0]?.raw
       : null;
 
-    const exDivIso = unixToIsoDate(sd.exDividendDate?.raw);
+    let exDivIso = unixToIsoDate(sd.exDividendDate?.raw);
+    let dividendAmount = Number.isFinite(Number(sd.dividendRate?.raw))
+      ? Number(sd.dividendRate.raw)
+      : null;
+
+    if (dividendAmount == null || exDivIso == null) {
+      const history = await fetchDividendHistory(sym);
+      if (dividendAmount == null) dividendAmount = history.annualDividend;
+      if (exDivIso == null) exDivIso = history.lastExDivDate;
+    }
 
     // A real pay date always falls strictly after its ex-dividend date.
     // Verified live against Yahoo: defaultKeyStatistics.lastDividendDate
@@ -319,9 +392,7 @@ async function fetchDividend(holding) {
 
     return {
       ticker: holding.ticker,
-      dividend_amount: Number.isFinite(Number(sd.dividendRate?.raw))
-        ? Number(sd.dividendRate.raw)
-        : null,
+      dividend_amount: dividendAmount,
       ex_div_date: exDivIso,
       pay_date: payDate,
       next_report_date: unixToIsoDate(nextReport),
