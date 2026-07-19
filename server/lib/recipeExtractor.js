@@ -1,14 +1,19 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const Anthropic = require('@anthropic-ai/sdk');
 const { getDb } = require('../db/init');
 const { emit } = require('./sseEmitter');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'lifeos.db');
 const PHOTO_DIR = process.env.RECIPE_PHOTO_PATH || path.join(path.dirname(DB_PATH), 'recipe-photos');
-const MODEL = process.env.RECIPE_VISION_MODEL || 'claude-opus-4-8';
 
-const SYSTEM_PROMPT = `You are a recipe transcription assistant. You extract structured recipe data from photographs of cookbook pages and handwritten recipe cards. You always respond with JSON matching the provided schema, and nothing else. You transcribe faithfully — you do not invent ingredients, quantities, or steps that are not visible in the photos.`;
+// Which OpenClaw agent handles extraction requests — see the "Agent-first
+// model contract" in the gateway's OpenAI-compatible endpoint docs.
+// "openclaw/default" runs the configured default agent's own default model;
+// RECIPE_VISION_MODEL_OVERRIDE (optional) pins a specific backend model via
+// the x-openclaw-model header instead.
+const AGENT_TARGET = process.env.RECIPE_EXTRACTION_AGENT || 'openclaw/default';
+
+const SYSTEM_PROMPT = `You are a recipe transcription assistant. You extract structured recipe data from photographs of cookbook pages and handwritten recipe cards. You always call the submit_recipe tool with the transcription — never respond with plain text. You transcribe faithfully — you do not invent ingredients, quantities, or steps that are not visible in the photos.`;
 
 const RECIPE_SCHEMA = {
   type: 'object',
@@ -43,9 +48,18 @@ const RECIPE_SCHEMA = {
   },
 };
 
+const SUBMIT_RECIPE_TOOL = {
+  type: 'function',
+  function: {
+    name: 'submit_recipe',
+    description: 'Submit the transcribed recipe as structured data.',
+    parameters: RECIPE_SCHEMA,
+  },
+};
+
 function userPrompt(pageCount, hints) {
   const hintLine = hints ? `\nThe user says this is from «${hints}».` : '';
-  return `These ${pageCount} images are consecutive pages of ONE recipe from a physical cookbook, in page order. Extract the single recipe they describe as JSON.
+  return `These ${pageCount} images are consecutive pages of ONE recipe from a physical cookbook, in page order. Extract the single recipe they describe by calling submit_recipe.
 
 RULES:
 1. Transcribe quantities exactly as printed ("½", "2-3", "a pinch") into \`quantity\` as a string; put the measure word in \`unit\` ("cup", "g", "tbsp") or null when there is none ("2 eggs").
@@ -63,14 +77,62 @@ function markFailed(recipeId, message) {
   emit('recipe_extraction', { id: recipeId, status: 'failed' });
 }
 
+async function callGateway(photos, hints) {
+  const url = `${process.env.OPENCLAW_GATEWAY_URL.replace(/\/$/, '')}/v1/chat/completions`;
+  const headers = {
+    Authorization: `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`,
+    'Content-Type': 'application/json',
+  };
+  if (process.env.RECIPE_VISION_MODEL_OVERRIDE) {
+    headers['x-openclaw-model'] = process.env.RECIPE_VISION_MODEL_OVERRIDE;
+  }
+
+  const body = {
+    model: AGENT_TARGET,
+    temperature: 0,
+    max_completion_tokens: 16000,
+    tools: [SUBMIT_RECIPE_TOOL],
+    tool_choice: { type: 'function', function: { name: 'submit_recipe' } },
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: [
+          ...photos.map((p) => ({
+            type: 'image_url',
+            image_url: { url: `data:${p.mime_type};base64,${fs.readFileSync(path.join(PHOTO_DIR, p.file_name)).toString('base64')}` },
+          })),
+          { type: 'text', text: userPrompt(photos.length, hints) },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Gateway returned ${res.status}: ${text.slice(0, 500)}`);
+  }
+
+  const json = await res.json();
+  const choice = json.choices?.[0];
+  if (choice?.finish_reason !== 'tool_calls') {
+    throw new Error(`Model did not return a structured recipe (finish_reason=${choice?.finish_reason ?? 'unknown'}): ${(choice?.message?.content || 'no content').slice(0, 300)}`);
+  }
+  const call = choice.message.tool_calls?.find((c) => c.function?.name === 'submit_recipe');
+  if (!call) throw new Error('Model did not call submit_recipe');
+
+  return JSON.parse(call.function.arguments);
+}
+
 // Fire-and-forget: callers never await this for the HTTP response — it only
 // ever resolves after writing a terminal 'review' or 'failed' state, and
 // never throws (every failure path is caught and persisted internally).
 async function extractRecipe(recipeId) {
   const db = getDb();
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    markFailed(recipeId, 'ANTHROPIC_API_KEY is not configured');
+  if (!process.env.OPENCLAW_GATEWAY_URL || !process.env.OPENCLAW_GATEWAY_TOKEN) {
+    markFailed(recipeId, 'OPENCLAW_GATEWAY_URL/OPENCLAW_GATEWAY_TOKEN is not configured');
     return;
   }
 
@@ -84,39 +146,7 @@ async function extractRecipe(recipeId) {
   const hints = [recipe?.source_book, recipe?.page_number ? `page ${recipe.page_number}` : null].filter(Boolean).join(', ');
 
   try {
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      output_config: { format: { type: 'json_schema', schema: RECIPE_SCHEMA } },
-      messages: [{
-        role: 'user',
-        content: [
-          ...photos.map((p) => ({
-            type: 'image',
-            source: { type: 'base64', media_type: p.mime_type, data: fs.readFileSync(path.join(PHOTO_DIR, p.file_name)).toString('base64') },
-          })),
-          { type: 'text', text: userPrompt(photos.length, hints) },
-        ],
-      }],
-    });
-
-    if (response.stop_reason === 'refusal') {
-      markFailed(recipeId, 'Model declined to transcribe this photo');
-      return;
-    }
-    if (response.stop_reason === 'max_tokens') {
-      markFailed(recipeId, 'Recipe was too long to transcribe in one pass');
-      return;
-    }
-
-    const textBlock = response.content.find((b) => b.type === 'text');
-    if (!textBlock) {
-      markFailed(recipeId, 'Model returned no transcription');
-      return;
-    }
-    const extracted = JSON.parse(textBlock.text);
+    const extracted = await callGateway(photos, hints);
 
     db.transaction(() => {
       db.prepare(`
@@ -136,7 +166,7 @@ async function extractRecipe(recipeId) {
         JSON.stringify(Array.isArray(extracted.main_ingredient) ? extracted.main_ingredient : []),
         JSON.stringify(Array.isArray(extracted.dietary_tags) ? extracted.dietary_tags : []),
         JSON.stringify(Array.isArray(extracted.tags) ? extracted.tags : []),
-        MODEL,
+        AGENT_TARGET,
         recipeId,
       );
 

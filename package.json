@@ -15,7 +15,6 @@
     "client:install": "npm --prefix client install"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.112.3",
     "better-sqlite3": "^11.8.1",
     "dotenv": "^16.4.7",
     "express": "^5.0.1",

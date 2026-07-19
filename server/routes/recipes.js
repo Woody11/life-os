@@ -147,11 +147,12 @@ router.get('/:id', asyncHandler((req, res) => {
 /**
  * POST /api/recipes — create from photos, kicks off AI extraction.
  *
- * With ANTHROPIC_API_KEY configured, the recipe starts in extraction_status
- *='processing' and extractRecipe() runs fire-and-forget after the response
- * is sent — it never throws, only ever resolving into a 'review' or 'failed'
- * terminal state. Without a key it degrades straight to 'review' with empty
- * fields (manual entry, same screen either way).
+ * With OPENCLAW_GATEWAY_URL/OPENCLAW_GATEWAY_TOKEN configured, the recipe
+ * starts in extraction_status='processing' and extractRecipe() runs
+ * fire-and-forget after the response is sent — it never throws, only ever
+ * resolving into a 'review' or 'failed' terminal state. Without those it
+ * degrades straight to 'review' with empty fields (manual entry, same
+ * screen either way).
  */
 router.post('/', upload.array('photos', MAX_PHOTOS), asyncHandler((req, res) => {
   if (!req.files?.length) {
@@ -160,7 +161,7 @@ router.post('/', upload.array('photos', MAX_PHOTOS), asyncHandler((req, res) => 
 
   const { source_book, page_number } = req.body ?? {};
   const db = getDb();
-  const hasExtraction = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasExtraction = Boolean(process.env.OPENCLAW_GATEWAY_URL && process.env.OPENCLAW_GATEWAY_TOKEN);
 
   const recipe = db.transaction(() => {
     const info = db.prepare(

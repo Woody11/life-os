@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 3030;
 // a missing upstream URL should just degrade that one dashboard card rather
 // than take the whole app down. This makes misconfiguration visible in logs
 // immediately instead of only when a user opens the affected tab.
-for (const key of ['WEALTHCANVAS_URL', 'LEGO_STUDIO_URL', 'OBSIDIAN_URL', 'OBSIDIAN_TOKEN', 'OPENCLAW_GATEWAY_URL', 'OPENCLAW_HOOK_TOKEN', 'GOOGLE_ACTIONS_URL', 'GOOGLE_ACTIONS_TOKEN', 'ANTHROPIC_API_KEY']) {
+for (const key of ['WEALTHCANVAS_URL', 'LEGO_STUDIO_URL', 'OBSIDIAN_URL', 'OBSIDIAN_TOKEN', 'OPENCLAW_GATEWAY_URL', 'OPENCLAW_HOOK_TOKEN', 'GOOGLE_ACTIONS_URL', 'GOOGLE_ACTIONS_TOKEN', 'OPENCLAW_GATEWAY_TOKEN']) {
   if (!process.env[key]) console.warn(`[life-os] ${key} is not set — related features will be degraded/disabled`);
 }
 
