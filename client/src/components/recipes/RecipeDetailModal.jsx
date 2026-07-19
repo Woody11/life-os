@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Pencil, Trash2, Clock, Users, BookOpen, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog.jsx';
 import RecipeEditForm from './RecipeEditForm.jsx';
+import PhotoStrip from './PhotoStrip.jsx';
+import PhotoRail from './PhotoRail.jsx';
 import { useSse } from '../SseContext.jsx';
 
 const POLL_MS = 3000;
@@ -149,14 +151,19 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
               <span className="text-sm">Loading…</span>
             </div>
           ) : editing ? (
-            <RecipeEditForm
-              recipe={data.recipe}
-              ingredients={data.ingredients}
-              steps={data.steps}
-              saving={saving}
-              onSave={handleSave}
-              onCancel={() => (data.recipe.title === 'Untitled recipe' ? onClose() : setEditing(false))}
-            />
+            <div className="flex flex-col gap-5 md:flex-row">
+              <PhotoRail photos={data.photos} />
+              <div className="min-w-0 flex-1">
+                <RecipeEditForm
+                  recipe={data.recipe}
+                  ingredients={data.ingredients}
+                  steps={data.steps}
+                  saving={saving}
+                  onSave={handleSave}
+                  onCancel={() => (data.recipe.title === 'Untitled recipe' ? onClose() : setEditing(false))}
+                />
+              </div>
+            </div>
           ) : data.recipe.extraction_status === 'processing' ? (
             <ProcessingView photos={data.photos} />
           ) : data.recipe.extraction_status === 'failed' ? (
@@ -182,17 +189,6 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
           onCancel={() => setConfirmingDelete(false)}
         />
       )}
-    </div>
-  );
-}
-
-function PhotoStrip({ photos }) {
-  if (!photos?.length) return null;
-  return (
-    <div className="flex gap-2 overflow-x-auto">
-      {photos.map((p) => (
-        <img key={p.id} src={p.url} alt={p.original_name || 'recipe photo'} className="h-40 w-40 shrink-0 rounded-xl border border-white/10 object-cover" />
-      ))}
     </div>
   );
 }
@@ -299,6 +295,16 @@ function RecipeView({ data }) {
           <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Notes</h3>
           <p className="text-sm text-slate-400 whitespace-pre-wrap">{recipe.notes}</p>
         </section>
+      )}
+
+      {recipe.transcription_notes && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div>
+            <p className="text-sm font-medium text-amber-300">From the original photos</p>
+            <p className="mt-1 text-xs text-amber-400/80">{recipe.transcription_notes}</p>
+          </div>
+        </div>
       )}
     </div>
   );

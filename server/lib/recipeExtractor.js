@@ -153,6 +153,7 @@ async function extractRecipe(recipeId) {
         UPDATE recipes SET
           title = ?, servings = ?, prep_time_min = ?, cook_time_min = ?, cuisine = ?,
           course = ?, main_ingredient = ?, dietary_tags = ?, tags = ?,
+          transcription_notes = ?,
           extraction_status = 'review', extraction_error = NULL, extraction_model = ?,
           updated_at = datetime('now')
         WHERE id = ?
@@ -166,7 +167,8 @@ async function extractRecipe(recipeId) {
         JSON.stringify(Array.isArray(extracted.main_ingredient) ? extracted.main_ingredient : []),
         JSON.stringify(Array.isArray(extracted.dietary_tags) ? extracted.dietary_tags : []),
         JSON.stringify(Array.isArray(extracted.tags) ? extracted.tags : []),
-        AGENT_TARGET,
+        extracted.transcription_notes ?? null,
+        process.env.RECIPE_VISION_MODEL_OVERRIDE || AGENT_TARGET,
         recipeId,
       );
 

@@ -46,6 +46,9 @@ function initDb() {
   if (!dispatchCols.has('cost_aud'))      db.prepare('ALTER TABLE dispatches ADD COLUMN cost_aud      REAL').run();
   if (!dispatchCols.has('model'))         db.prepare('ALTER TABLE dispatches ADD COLUMN model         TEXT').run();
 
+  const recipeCols = new Set(db.pragma('table_info(recipes)').map((c) => c.name));
+  if (!recipeCols.has('transcription_notes')) db.prepare('ALTER TABLE recipes ADD COLUMN transcription_notes TEXT').run();
+
   const syncQueueCols = new Set(db.pragma('table_info(obsidian_sync_queue)').map((c) => c.name));
   if (!syncQueueCols.has('status')) {
     db.prepare("ALTER TABLE obsidian_sync_queue ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'").run();

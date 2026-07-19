@@ -4,6 +4,7 @@ import Toast from '../components/Toast.jsx';
 import RecipeCard from '../components/recipes/RecipeCard.jsx';
 import RecipeDetailModal from '../components/recipes/RecipeDetailModal.jsx';
 import { useSse } from '../components/SseContext.jsx';
+import { downscalePhotos } from '../lib/downscalePhoto.js';
 
 const POLL_MS = 3000;
 
@@ -12,7 +13,17 @@ function AddRecipeForm({ onCreated, onToast }) {
   const [files, setFiles] = useState([]);
   const [sourceBook, setSourceBook] = useState('');
   const [pageNumber, setPageNumber] = useState('');
+  const [preparing, setPreparing] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  async function handleFiles(fileList) {
+    setPreparing(true);
+    try {
+      setFiles(await downscalePhotos(Array.from(fileList ?? [])));
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -67,21 +78,23 @@ function AddRecipeForm({ onCreated, onToast }) {
       </div>
       <input
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         multiple
-        onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        onChange={(e) => handleFiles(e.target.files)}
         className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-white/[0.06] file:px-3 file:py-2 file:text-sm file:text-slate-200 hover:file:bg-white/[0.1]"
       />
-      {files.length > 0 && (
+      {preparing ? (
+        <p className="mt-2 text-xs text-slate-500">Preparing photos…</p>
+      ) : files.length > 0 ? (
         <p className="mt-2 text-xs text-slate-500">{files.length} photo{files.length !== 1 ? 's' : ''} selected</p>
-      )}
+      ) : null}
       <div className="mt-3 flex justify-end gap-2">
         <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-white">
           Cancel
         </button>
         <button
           type="submit"
-          disabled={!files.length || uploading}
+          disabled={!files.length || preparing || uploading}
           className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm text-indigo-300 transition-all hover:bg-indigo-500/20 disabled:opacity-40"
         >
           {uploading ? 'Uploading…' : 'Create recipe'}

@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS recipes (
                     CHECK(extraction_status IN ('processing','review','saved','failed')),
   extraction_error  TEXT,               -- populated when status='failed'
   extraction_model  TEXT,               -- audit: which model produced the draft
+  transcription_notes TEXT,             -- model's own note on illegible/cropped regions, null if fully legible
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );

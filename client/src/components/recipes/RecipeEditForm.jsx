@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import TagListInput from './TagListInput.jsx';
 
 const inputClass = 'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-indigo-500/50 focus:outline-none';
@@ -65,6 +65,16 @@ export default function RecipeEditForm({ recipe, ingredients, steps, saving, onS
 
   return (
     <form onSubmit={submit} className="space-y-5">
+      {recipe.transcription_notes && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div>
+            <p className="text-sm font-medium text-amber-300">Check against the photos</p>
+            <p className="mt-1 text-xs text-amber-400/80">{recipe.transcription_notes}</p>
+          </div>
+        </div>
+      )}
+
       <Field label="Title">
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Recipe title" required className={inputClass} />
       </Field>
