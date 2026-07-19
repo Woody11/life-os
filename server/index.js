@@ -19,6 +19,7 @@ const googleRouter  = require('./routes/google');
 const weatherRouter = require('./routes/weather');
 const habitsRouter  = require('./routes/habits');
 const goalsRouter   = require('./routes/goals');
+const recipesRouter = require('./routes/recipes');
 const { startObsidianSync } = require('./sync/obsidian');
 
 const PORT = process.env.PORT || 3030;
@@ -71,6 +72,7 @@ app.use('/api/google',  googleRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/habits',  habitsRouter);
 app.use('/api/goals',   goalsRouter);
+app.use('/api/recipes', recipesRouter);
 app.use('/api/search',  require('./routes/search'));
 
 // Serve the built frontend. In production the client is compiled to

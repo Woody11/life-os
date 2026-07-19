@@ -7,6 +7,7 @@ import DispatchTab from './tabs/DispatchTab.jsx';
 import KanbanTab   from './tabs/KanbanTab.jsx';
 import HabitsTab   from './tabs/HabitsTab.jsx';
 import GoalsTab    from './tabs/GoalsTab.jsx';
+import RecipesTab  from './tabs/RecipesTab.jsx';
 import { SseProvider } from './components/SseContext.jsx';
 import { todayAdelaide } from './lib/adelaideDate';
 import { Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle } from 'lucide-react';
@@ -24,8 +25,9 @@ const NAV_GROUPS = [
     { to: '/mbs',  label: 'MBS' },
   ] },
   { label: 'Life', tabs: [
-    { to: '/habits', label: 'Habits' },
-    { to: '/goals',  label: 'Goals' },
+    { to: '/habits',  label: 'Habits' },
+    { to: '/goals',   label: 'Goals' },
+    { to: '/recipes', label: 'Recipes' },
   ] },
 ];
 
@@ -462,6 +464,7 @@ export default function App() {
               <Route path="/kanban"  element={<KanbanTab />} />
               <Route path="/habits"  element={<HabitsTab />} />
               <Route path="/goals"   element={<GoalsTab />} />
+              <Route path="/recipes" element={<RecipesTab />} />
             </Routes>
           </main>
         </div>

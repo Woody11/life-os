@@ -113,9 +113,66 @@ CREATE TABLE IF NOT EXISTS agent_models (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Recipes (photo-imported cookbook recipes — see vault "Life OS - Recipe
+-- Tracker - Detailed Build Plan" for the full design).
+CREATE TABLE IF NOT EXISTS recipes (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  title             TEXT    NOT NULL DEFAULT 'Untitled recipe',
+  source_book       TEXT,
+  page_number       TEXT,               -- TEXT: "112-113", "back cover"
+  servings          TEXT,               -- TEXT: "4", "4-6", "makes 24"
+  prep_time_min     INTEGER,
+  cook_time_min     INTEGER,
+  cuisine           TEXT,               -- free text, e.g. "Thai" — not a fixed list
+  course            TEXT,               -- JSON array, e.g. '["dinner","side"]' — can span multiple
+  main_ingredient   TEXT,               -- JSON array, e.g. '["chicken"]'
+  dietary_tags      TEXT,               -- JSON array, e.g. '["vegetarian","gluten-free"]'
+  tags              TEXT,               -- JSON array, free-form catch-all
+  notes             TEXT,               -- Woody's own notes ("used less chilli, great")
+  extraction_status TEXT NOT NULL DEFAULT 'saved'
+                    CHECK(extraction_status IN ('processing','review','saved','failed')),
+  extraction_error  TEXT,               -- populated when status='failed'
+  extraction_model  TEXT,               -- audit: which model produced the draft
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipe_id  INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  ingredient TEXT    NOT NULL,          -- "plain flour"
+  quantity   TEXT,                      -- TEXT, not REAL: "1/2", "2-3", "a pinch"
+  unit       TEXT,                      -- "cup", "g", "tbsp", NULL for "2 eggs"
+  note       TEXT,                      -- "softened", "plus extra for dusting"
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS recipe_steps (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipe_id   INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  step_number INTEGER NOT NULL,
+  instruction TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recipe_photos (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipe_id     INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  file_name     TEXT    NOT NULL,       -- server-generated, e.g. "12-0-1721361600000.jpg"
+  original_name TEXT,
+  mime_type     TEXT    NOT NULL,
+  size_bytes    INTEGER,
+  sort_order    INTEGER NOT NULL DEFAULT 0,  -- page order
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Indexes for frequent query patterns
 CREATE INDEX IF NOT EXISTS idx_dispatches_status          ON dispatches(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_kanban_cards_domain        ON kanban_cards(domain, updated_at);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_next            ON obsidian_sync_queue(attempts, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_habit_completions_hab_date ON habit_completions(habit_id, completed_date);
 CREATE INDEX IF NOT EXISTS idx_goals_status               ON goals(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_recipes_status              ON recipes(extraction_status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe   ON recipe_ingredients(recipe_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_name     ON recipe_ingredients(ingredient);
+CREATE INDEX IF NOT EXISTS idx_recipe_steps_recipe         ON recipe_steps(recipe_id, step_number);
+CREATE INDEX IF NOT EXISTS idx_recipe_photos_recipe        ON recipe_photos(recipe_id, sort_order);
