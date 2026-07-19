@@ -4,6 +4,7 @@ const express = require('express');
 const multer = require('multer');
 const { getDb } = require('../db/init');
 const { asyncHandler } = require('../lib/asyncHandler');
+const { extractRecipe } = require('../lib/recipeExtractor');
 
 const router = express.Router();
 
@@ -144,12 +145,13 @@ router.get('/:id', asyncHandler((req, res) => {
 }));
 
 /**
- * POST /api/recipes — create from photos.
+ * POST /api/recipes — create from photos, kicks off AI extraction.
  *
- * Phase 1 only: no AI extraction wired up yet, so every recipe lands in
- * extraction_status='review' straight away (the same "degraded manual entry"
- * state Phase 2's missing-API-key path will also produce) — the review
- * screen is reused as the manual-entry form.
+ * With ANTHROPIC_API_KEY configured, the recipe starts in extraction_status
+ *='processing' and extractRecipe() runs fire-and-forget after the response
+ * is sent — it never throws, only ever resolving into a 'review' or 'failed'
+ * terminal state. Without a key it degrades straight to 'review' with empty
+ * fields (manual entry, same screen either way).
  */
 router.post('/', upload.array('photos', MAX_PHOTOS), asyncHandler((req, res) => {
   if (!req.files?.length) {
@@ -158,12 +160,13 @@ router.post('/', upload.array('photos', MAX_PHOTOS), asyncHandler((req, res) => 
 
   const { source_book, page_number } = req.body ?? {};
   const db = getDb();
+  const hasExtraction = Boolean(process.env.ANTHROPIC_API_KEY);
 
   const recipe = db.transaction(() => {
     const info = db.prepare(
       `INSERT INTO recipes (title, source_book, page_number, extraction_status)
-       VALUES (?, ?, ?, 'review')`,
-    ).run('Untitled recipe', source_book?.trim() || null, page_number?.trim() || null);
+       VALUES (?, ?, ?, ?)`,
+    ).run('Untitled recipe', source_book?.trim() || null, page_number?.trim() || null, hasExtraction ? 'processing' : 'review');
     const recipeId = info.lastInsertRowid;
 
     req.files.forEach((file, index) => {
@@ -180,6 +183,26 @@ router.post('/', upload.array('photos', MAX_PHOTOS), asyncHandler((req, res) => 
   })();
 
   res.status(201).json({ recipe: hydrateRecipe(recipe) });
+
+  if (hasExtraction) extractRecipe(recipe.id);
+}));
+
+/** POST /api/recipes/:id/extract — (re)run extraction against stored photos */
+router.post('/:id/extract', asyncHandler((req, res) => {
+  const db = getDb();
+  const recipe = db.prepare('SELECT id, extraction_status FROM recipes WHERE id = ?').get(req.params.id);
+  if (!recipe) return res.status(404).json({ error: 'Not found' });
+  if (recipe.extraction_status === 'processing') return res.status(409).json({ error: 'Extraction already in progress' });
+
+  const photoCount = db.prepare('SELECT COUNT(*) AS n FROM recipe_photos WHERE recipe_id = ?').get(req.params.id).n;
+  if (!photoCount) return res.status(400).json({ error: 'No photos to extract from' });
+
+  db.prepare(`UPDATE recipes SET extraction_status = 'processing', extraction_error = NULL, updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  const updated = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id);
+
+  res.status(202).json({ recipe: hydrateRecipe(updated) });
+
+  extractRecipe(Number(req.params.id));
 }));
 
 /** PUT /api/recipes/:id — the review/edit save (full replace of ingredients/steps) */

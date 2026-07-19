@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef } from 'react
 const SseContext = createContext(null);
 
 // Named SSE event types the server emits.
-const KNOWN_EVENTS = ['dispatch_updated', 'dispatch_created', 'kanban_updated'];
+const KNOWN_EVENTS = ['dispatch_updated', 'dispatch_created', 'kanban_updated', 'recipe_extraction'];
 
 export function SseProvider({ children }) {
   // Map<eventType, Set<handler>>

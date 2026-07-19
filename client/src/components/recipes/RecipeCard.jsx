@@ -1,7 +1,14 @@
-import { ImageOff, BookOpen } from 'lucide-react';
+import { ImageOff, BookOpen, Loader2 } from 'lucide-react';
+
+const STATUS_PILL = {
+  processing: { label: 'Reading…', className: 'bg-indigo-500/90 text-white' },
+  review: { label: 'Needs review', className: 'bg-amber-500/90 text-black' },
+  failed: { label: 'Failed', className: 'bg-rose-500/90 text-white' },
+};
 
 export default function RecipeCard({ recipe, onOpen }) {
-  const needsReview = recipe.extraction_status === 'review';
+  const pill = STATUS_PILL[recipe.extraction_status];
+  const untitled = recipe.title === 'Untitled recipe';
 
   return (
     <button
@@ -16,15 +23,16 @@ export default function RecipeCard({ recipe, onOpen }) {
             <ImageOff className="h-8 w-8" />
           </div>
         )}
-        {needsReview && (
-          <span className="absolute right-2 top-2 rounded-lg bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-black">
-            Needs review
+        {pill && (
+          <span className={`absolute right-2 top-2 inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-semibold ${pill.className}`}>
+            {recipe.extraction_status === 'processing' && <Loader2 className="h-3 w-3 animate-spin" />}
+            {pill.label}
           </span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <div className="text-sm font-semibold text-white truncate">
-          {needsReview ? 'Untitled — tap to fill in' : recipe.title}
+          {untitled ? 'Untitled — tap to fill in' : recipe.title}
         </div>
         {recipe.source_book && (
           <div className="flex items-center gap-1 text-xs text-slate-500 truncate">

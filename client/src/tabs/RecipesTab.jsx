@@ -3,6 +3,9 @@ import { Camera, Search as SearchIcon } from 'lucide-react';
 import Toast from '../components/Toast.jsx';
 import RecipeCard from '../components/recipes/RecipeCard.jsx';
 import RecipeDetailModal from '../components/recipes/RecipeDetailModal.jsx';
+import { useSse } from '../components/SseContext.jsx';
+
+const POLL_MS = 3000;
 
 function AddRecipeForm({ onCreated, onToast }) {
   const [open, setOpen] = useState(false);
@@ -95,15 +98,16 @@ export default function RecipesTab() {
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const { subscribe } = useSse();
 
-  function load(q) {
-    setLoading(true);
+  function load(q, { silent = false } = {}) {
+    if (!silent) setLoading(true);
     const url = q?.trim() ? `/api/recipes?q=${encodeURIComponent(q.trim())}` : '/api/recipes';
-    fetch(url)
+    return fetch(url)
       .then((r) => r.json())
       .then((d) => setRecipes(d.recipes ?? []))
-      .catch(() => setError('Failed to load recipes'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silent) setError('Failed to load recipes'); })
+      .finally(() => { if (!silent) setLoading(false); });
   }
 
   useEffect(() => {
@@ -111,6 +115,18 @@ export default function RecipesTab() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
+
+  // Extraction pipeline pushes here so cards flip from "Reading…" to
+  // "Needs review" without a manual refresh, even if the detail modal for
+  // that recipe was closed. A poll covers a dropped SSE connection.
+  useEffect(() => subscribe(() => load(query, { silent: true }), 'recipe_extraction'), [subscribe, query]);
+
+  useEffect(() => {
+    if (!recipes.some((r) => r.extraction_status === 'processing')) return undefined;
+    const t = setInterval(() => load(query, { silent: true }), POLL_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipes, query]);
 
   function handleCreated(recipe) {
     setRecipes((prev) => [recipe, ...prev]);

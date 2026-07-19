@@ -1,31 +1,60 @@
-import { useEffect, useState } from 'react';
-import { X, Pencil, Trash2, Clock, Users, BookOpen } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, Pencil, Trash2, Clock, Users, BookOpen, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog.jsx';
 import RecipeEditForm from './RecipeEditForm.jsx';
+import { useSse } from '../SseContext.jsx';
+
+const POLL_MS = 3000;
 
 export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDeleted, onToast }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { subscribe } = useSse();
+  const editingTouchedRef = useRef(false);
+
+  function load() {
+    return fetch(`/api/recipes/${recipeId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setData(d);
+        // A freshly-imported or just-extracted recipe goes straight to
+        // editing so the review screen doubles as the manual-entry form —
+        // but only the first time we see it, not after every re-poll.
+        if (!editingTouchedRef.current && d.recipe?.extraction_status === 'review') {
+          setEditing(true);
+        }
+        onSaved(d.recipe);
+        return d;
+      })
+      .catch(() => { onToast('Failed to load recipe'); });
+  }
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/recipes/${recipeId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        setData(d);
-        // A freshly-imported recipe with no title yet goes straight to editing.
-        setEditing(d.recipe?.extraction_status === 'review');
-      })
-      .catch(() => { if (!cancelled) onToast('Failed to load recipe'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    editingTouchedRef.current = false;
+    load().finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipeId]);
+
+  // SSE push from the extraction pipeline, with a 3s poll fallback while
+  // processing in case the SSE connection dropped.
+  useEffect(() => subscribe((event) => {
+    if (event?.id === recipeId) load();
+  }, 'recipe_extraction'), [recipeId, subscribe]);
+
+  useEffect(() => {
+    if (data?.recipe?.extraction_status !== 'processing') return undefined;
+    const t = setInterval(load, POLL_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.recipe?.extraction_status]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -34,6 +63,24 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
+
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/recipes/${recipeId}/extract`, { method: 'POST' });
+      if (!res.ok) throw new Error('not ok');
+      await load();
+    } catch {
+      onToast('Retry failed — please try again');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  function startManualEntry() {
+    editingTouchedRef.current = true;
+    setEditing(true);
+  }
 
   async function handleSave(payload) {
     setSaving(true);
@@ -79,9 +126,9 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
             {data?.recipe?.title && data.recipe.title !== 'Untitled recipe' ? data.recipe.title : 'New recipe'}
           </h2>
           <div className="flex items-center gap-1">
-            {!loading && !editing && (
+            {!loading && !editing && data.recipe.extraction_status !== 'processing' && (
               <>
-                <button onClick={() => setEditing(true)} className="rounded-lg p-2 text-slate-500 hover:bg-white/[0.06] hover:text-white" aria-label="Edit">
+                <button onClick={startManualEntry} className="rounded-lg p-2 text-slate-500 hover:bg-white/[0.06] hover:text-white" aria-label="Edit">
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button onClick={() => setConfirmingDelete(true)} className="rounded-lg p-2 text-slate-500 hover:bg-white/[0.06] hover:text-rose-400" aria-label="Delete">
@@ -110,6 +157,15 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
               onSave={handleSave}
               onCancel={() => (data.recipe.title === 'Untitled recipe' ? onClose() : setEditing(false))}
             />
+          ) : data.recipe.extraction_status === 'processing' ? (
+            <ProcessingView photos={data.photos} />
+          ) : data.recipe.extraction_status === 'failed' ? (
+            <FailedView
+              data={data}
+              retrying={retrying}
+              onRetry={handleRetry}
+              onManualEntry={startManualEntry}
+            />
           ) : (
             <RecipeView data={data} />
           )}
@@ -130,18 +186,62 @@ export default function RecipeDetailModal({ recipeId, onClose, onSaved, onDelete
   );
 }
 
+function PhotoStrip({ photos }) {
+  if (!photos?.length) return null;
+  return (
+    <div className="flex gap-2 overflow-x-auto">
+      {photos.map((p) => (
+        <img key={p.id} src={p.url} alt={p.original_name || 'recipe photo'} className="h-40 w-40 shrink-0 rounded-xl border border-white/10 object-cover" />
+      ))}
+    </div>
+  );
+}
+
+function ProcessingView({ photos }) {
+  return (
+    <div className="space-y-5">
+      <PhotoStrip photos={photos} />
+      <div className="flex flex-col items-center gap-3 py-10 text-slate-400">
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+        <p className="text-sm">Reading the page…</p>
+      </div>
+    </div>
+  );
+}
+
+function FailedView({ data, retrying, onRetry, onManualEntry }) {
+  return (
+    <div className="space-y-5">
+      <PhotoStrip photos={data.photos} />
+      <div className="flex items-start gap-3 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+        <div>
+          <p className="text-sm font-medium text-rose-300">Extraction failed</p>
+          <p className="mt-1 text-xs text-rose-400/80">{data.recipe.extraction_error || 'Something went wrong reading this photo.'}</p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onRetry}
+          disabled={retrying}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm text-indigo-300 hover:bg-indigo-500/20 disabled:opacity-40"
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> {retrying ? 'Retrying…' : 'Retry'}
+        </button>
+        <button onClick={onManualEntry} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-white">
+          Enter manually
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RecipeView({ data }) {
   const { recipe, ingredients, steps, photos } = data;
 
   return (
     <div className="space-y-5">
-      {photos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto">
-          {photos.map((p) => (
-            <img key={p.id} src={p.url} alt={p.original_name || 'recipe photo'} className="h-40 w-40 shrink-0 rounded-xl border border-white/10 object-cover" />
-          ))}
-        </div>
-      )}
+      <PhotoStrip photos={photos} />
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-400">
         {recipe.source_book && (
