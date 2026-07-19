@@ -83,9 +83,52 @@ function buildDispatchNote(payload) {
   return lines.join('\n');
 }
 
+function buildRecipeNote(payload) {
+  const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
+  const r = p.recipe ?? p;
+  const tagLine = [r.cuisine, ...(r.course ?? []), ...(r.main_ingredient ?? []), ...(r.dietary_tags ?? []), ...(r.tags ?? [])]
+    .filter(Boolean);
+  const lines = [
+    `---`,
+    ...(r.cuisine ? [`cuisine: ${yamlScalar(r.cuisine)}`] : []),
+    ...(tagLine.length ? [`tags: [${tagLine.map(yamlScalar).join(', ')}]`] : []),
+    ...(r.source_book ? [`source: ${yamlScalar(r.source_book)}${r.page_number ? ` (p.${r.page_number})` : ''}`] : []),
+    `---`,
+    ``,
+    `# ${r.title ?? 'Untitled recipe'}`,
+    ``,
+  ];
+  const meta = [
+    r.servings ? `**Servings:** ${r.servings}` : null,
+    r.prep_time_min ? `**Prep:** ${r.prep_time_min} min` : null,
+    r.cook_time_min ? `**Cook:** ${r.cook_time_min} min` : null,
+  ].filter(Boolean);
+  if (meta.length) lines.push(meta.join(' · '), ``);
+
+  if (p.ingredients?.length) {
+    lines.push(`## Ingredients`, ``);
+    p.ingredients.forEach((i) => {
+      const qty = [i.quantity, i.unit].filter(Boolean).join(' ');
+      lines.push(`- ${[qty, i.ingredient].filter(Boolean).join(' ')}${i.note ? ` (${i.note})` : ''}`);
+    });
+    lines.push(``);
+  }
+
+  if (p.steps?.length) {
+    lines.push(`## Steps`, ``);
+    p.steps.forEach((s, idx) => lines.push(`${idx + 1}. ${s.instruction ?? s}`));
+    lines.push(``);
+  }
+
+  if (r.notes) lines.push(`## Notes`, ``, r.notes, ``);
+
+  return lines.join('\n');
+}
+
 function buildNote(entityType, payload) {
   if (entityType === 'kanban_card') return buildKanbanCardNote(payload);
   if (entityType === 'dispatch')    return buildDispatchNote(payload);
+  if (entityType === 'recipe')      return buildRecipeNote(payload);
   // Fallback: dump JSON as a code block
   const p = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
   return `# ${entityType}\n\n\`\`\`json\n${p}\n\`\`\`\n`;

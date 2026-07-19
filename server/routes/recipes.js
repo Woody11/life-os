@@ -8,6 +8,37 @@ const { extractRecipe } = require('../lib/recipeExtractor');
 
 const router = express.Router();
 
+// Mirrors the pattern in routes/kanban.js — strips characters so a title
+// can't escape the intended vault folder (e.g. "../../x") or otherwise
+// produce an unexpected nested/invalid path.
+function sanitizeForFilename(value) {
+  const cleaned = String(value ?? '')
+    .replace(/[\/\\]/g, '-')
+    .replace(/[<>:"|?*\x00-\x1f]/g, '')
+    .trim()
+    .slice(0, 150);
+  return cleaned || 'Untitled';
+}
+
+function queueObsidianSync(db, recipeId, payload) {
+  const vaultPath = `90 Recipes/${sanitizeForFilename(payload.recipe.title)}.md`;
+  try {
+    db.prepare(
+      `INSERT INTO obsidian_sync_queue (entity_type, entity_id, payload, vault_path)
+       VALUES ('recipe', ?, ?, ?)
+       ON CONFLICT(vault_path) DO UPDATE SET
+         entity_id = excluded.entity_id,
+         payload   = excluded.payload,
+         attempts  = 0,
+         last_error = NULL,
+         status    = 'pending',
+         next_attempt_at = NULL`,
+    ).run(recipeId, JSON.stringify(payload), vaultPath);
+  } catch {
+    // sync is fire-and-forget; never block the main response
+  }
+}
+
 // Photos live next to the DB file (same data/ dir, so the existing Docker
 // volume mount covers both with zero compose changes) unless overridden.
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'lifeos.db');
@@ -70,16 +101,51 @@ function photoToApiShape(photo) {
   };
 }
 
+const SORT_COLUMNS = {
+  updated: '(extraction_status != \'saved\') DESC, updated_at DESC',
+  created: 'created_at DESC',
+  title: 'title COLLATE NOCASE ASC',
+};
+
+/** GET /api/recipes/facets — distinct filter values for the Recipes tab UI */
+router.get('/facets', asyncHandler((_req, res) => {
+  const db = getDb();
+  const rows = db.prepare(`SELECT cuisine, course, main_ingredient, dietary_tags FROM recipes WHERE extraction_status = 'saved'`).all();
+
+  const cuisines = new Set();
+  const courses = new Set();
+  const mainIngredients = new Set();
+  const dietaryTags = new Set();
+  for (const row of rows) {
+    if (row.cuisine) cuisines.add(row.cuisine);
+    parseJsonArray(row.course).forEach((v) => courses.add(v));
+    parseJsonArray(row.main_ingredient).forEach((v) => mainIngredients.add(v));
+    parseJsonArray(row.dietary_tags).forEach((v) => dietaryTags.add(v));
+  }
+
+  res.json({
+    cuisines: [...cuisines].sort(),
+    courses: [...courses].sort(),
+    main_ingredients: [...mainIngredients].sort(),
+    dietary_tags: [...dietaryTags].sort(),
+  });
+}));
+
 /** GET /api/recipes — list/search */
 router.get('/', asyncHandler((req, res) => {
-  const { q, tag, cuisine, status } = req.query;
+  const { q, tag, cuisine, course, main_ingredient, dietary_tags, status, sort } = req.query;
   const db = getDb();
 
   const clauses = [];
   const params = [];
   if (q?.trim()) {
-    clauses.push('(title LIKE ? OR source_book LIKE ?)');
-    params.push(`%${q.trim()}%`, `%${q.trim()}%`);
+    // Ingredient-aware: a search for "chicken" should surface recipes that
+    // use it even when the title/source book doesn't mention it.
+    clauses.push(`(title LIKE ? OR source_book LIKE ? OR EXISTS (
+      SELECT 1 FROM recipe_ingredients WHERE recipe_id = r.id AND ingredient LIKE ?
+    ))`);
+    const like = `%${q.trim()}%`;
+    params.push(like, like, like);
   }
   if (tag?.trim()) {
     // JSON-as-TEXT substring match — fine at personal-collection scale.
@@ -91,19 +157,32 @@ router.get('/', asyncHandler((req, res) => {
     clauses.push('cuisine = ?');
     params.push(cuisine.trim());
   }
+  if (course?.trim()) {
+    clauses.push('course LIKE ?');
+    params.push(`%"${course.trim()}"%`);
+  }
+  if (main_ingredient?.trim()) {
+    clauses.push('main_ingredient LIKE ?');
+    params.push(`%"${main_ingredient.trim()}"%`);
+  }
+  if (dietary_tags?.trim()) {
+    clauses.push('dietary_tags LIKE ?');
+    params.push(`%"${dietary_tags.trim()}"%`);
+  }
   if (status?.trim()) {
     clauses.push('extraction_status = ?');
     params.push(status.trim());
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const orderBy = SORT_COLUMNS[sort?.trim()] || SORT_COLUMNS.updated;
   const rows = db.prepare(`
     SELECT r.*,
            (SELECT COUNT(*) FROM recipe_ingredients WHERE recipe_id = r.id) AS ingredient_count,
            (SELECT file_name FROM recipe_photos WHERE recipe_id = r.id ORDER BY sort_order LIMIT 1) AS cover_photo_file
     FROM recipes r
     ${where}
-    ORDER BY (extraction_status != 'saved') DESC, updated_at DESC
+    ORDER BY ${orderBy}
   `).all(...params);
 
   const recipes = rows.map((row) => {
@@ -275,9 +354,12 @@ router.put('/:id', asyncHandler((req, res) => {
   const hydratedIngredients = db.prepare('SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order').all(req.params.id);
   const hydratedSteps = db.prepare('SELECT * FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number').all(req.params.id);
   const photos = db.prepare('SELECT * FROM recipe_photos WHERE recipe_id = ? ORDER BY sort_order').all(req.params.id);
+  const hydratedRecipe = hydrateRecipe(recipe);
+
+  queueObsidianSync(db, recipe.id, { recipe: hydratedRecipe, ingredients: hydratedIngredients, steps: hydratedSteps });
 
   res.json({
-    recipe: hydrateRecipe(recipe),
+    recipe: hydratedRecipe,
     ingredients: hydratedIngredients,
     steps: hydratedSteps,
     photos: photos.map(photoToApiShape),

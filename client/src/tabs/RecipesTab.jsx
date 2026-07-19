@@ -104,19 +104,56 @@ function AddRecipeForm({ onCreated, onToast }) {
   );
 }
 
+const EMPTY_FACETS = { cuisines: [], courses: [], main_ingredients: [], dietary_tags: [] };
+
+function FilterSelect({ label, value, onChange, options }) {
+  if (!options?.length) return null;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`rounded-xl border px-3 py-1.5 text-xs outline-none focus:border-indigo-500/50 ${
+        value ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300' : 'border-white/10 bg-white/[0.04] text-slate-300'
+      }`}
+    >
+      <option value="">{label}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  );
+}
+
 export default function RecipesTab() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
+  const [cuisine, setCuisine] = useState('');
+  const [course, setCourse] = useState('');
+  const [mainIngredient, setMainIngredient] = useState('');
+  const [dietaryTag, setDietaryTag] = useState('');
+  const [sort, setSort] = useState('updated');
+  const [facets, setFacets] = useState(EMPTY_FACETS);
   const [selectedId, setSelectedId] = useState(null);
   const { subscribe } = useSse();
 
-  function load(q, { silent = false } = {}) {
+  useEffect(() => {
+    fetch('/api/recipes/facets').then((r) => r.json()).then(setFacets).catch(() => {});
+  }, []);
+
+  function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
-    const url = q?.trim() ? `/api/recipes?q=${encodeURIComponent(q.trim())}` : '/api/recipes';
-    return fetch(url)
+    const params = new URLSearchParams();
+    if (query.trim()) params.set('q', query.trim());
+    if (cuisine) params.set('cuisine', cuisine);
+    if (course) params.set('course', course);
+    if (mainIngredient) params.set('main_ingredient', mainIngredient);
+    if (dietaryTag) params.set('dietary_tags', dietaryTag);
+    if (sort !== 'updated') params.set('sort', sort);
+    const qs = params.toString();
+    return fetch(qs ? `/api/recipes?${qs}` : '/api/recipes')
       .then((r) => r.json())
       .then((d) => setRecipes(d.recipes ?? []))
       .catch(() => { if (!silent) setError('Failed to load recipes'); })
@@ -124,22 +161,22 @@ export default function RecipesTab() {
   }
 
   useEffect(() => {
-    const t = setTimeout(() => load(query), 250);
+    const t = setTimeout(() => load(), 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [query, cuisine, course, mainIngredient, dietaryTag, sort]);
 
   // Extraction pipeline pushes here so cards flip from "Reading…" to
   // "Needs review" without a manual refresh, even if the detail modal for
   // that recipe was closed. A poll covers a dropped SSE connection.
-  useEffect(() => subscribe(() => load(query, { silent: true }), 'recipe_extraction'), [subscribe, query]);
+  useEffect(() => subscribe(() => load({ silent: true }), 'recipe_extraction'), [subscribe, query, cuisine, course, mainIngredient, dietaryTag, sort]);
 
   useEffect(() => {
     if (!recipes.some((r) => r.extraction_status === 'processing')) return undefined;
-    const t = setInterval(() => load(query, { silent: true }), POLL_MS);
+    const t = setInterval(() => load({ silent: true }), POLL_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipes, query]);
+  }, [recipes, query, cuisine, course, mainIngredient, dietaryTag, sort]);
 
   function handleCreated(recipe) {
     setRecipes((prev) => [recipe, ...prev]);
@@ -164,14 +201,30 @@ export default function RecipesTab() {
         <AddRecipeForm onCreated={handleCreated} onToast={setToast} />
       </div>
 
-      <div className="mb-6 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+      <div className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
         <SearchIcon className="h-4 w-4 text-slate-500" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title or source book…"
+          placeholder="Search by title, source book, or ingredient…"
           className="flex-1 bg-transparent text-sm text-white placeholder-slate-600 outline-none"
         />
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        <FilterSelect label="Cuisine" value={cuisine} onChange={setCuisine} options={facets.cuisines} />
+        <FilterSelect label="Course" value={course} onChange={setCourse} options={facets.courses} />
+        <FilterSelect label="Main ingredient" value={mainIngredient} onChange={setMainIngredient} options={facets.main_ingredients} />
+        <FilterSelect label="Dietary" value={dietaryTag} onChange={setDietaryTag} options={facets.dietary_tags} />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 outline-none focus:border-indigo-500/50"
+        >
+          <option value="updated">Recently updated</option>
+          <option value="created">Recently added</option>
+          <option value="title">Title A–Z</option>
+        </select>
       </div>
 
       {loading ? (

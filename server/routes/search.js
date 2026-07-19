@@ -24,6 +24,15 @@ router.get('/', (req, res) => {
     .forEach(r => results.push(r));
   db.prepare(`SELECT id, name as title, NULL as excerpt, 'habit' as type FROM habits WHERE name LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT 5`).all(like)
     .forEach(r => results.push(r));
+  db.prepare(`
+    SELECT id, title, source_book as excerpt, 'recipe' as type
+    FROM recipes
+    WHERE title LIKE ? ESCAPE '\\'
+       OR source_book LIKE ? ESCAPE '\\'
+       OR EXISTS (SELECT 1 FROM recipe_ingredients WHERE recipe_id = recipes.id AND ingredient LIKE ? ESCAPE '\\')
+    ORDER BY updated_at DESC LIMIT 10
+  `).all(like, like, like)
+    .forEach(r => results.push(r));
 
   res.json({ results, query: q });
 });

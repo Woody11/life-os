@@ -10,7 +10,7 @@ import GoalsTab    from './tabs/GoalsTab.jsx';
 import RecipesTab  from './tabs/RecipesTab.jsx';
 import { SseProvider } from './components/SseContext.jsx';
 import { todayAdelaide } from './lib/adelaideDate';
-import { Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle } from 'lucide-react';
+import { Search, Bell, Menu, X, Send, LayoutGrid, Target, Flame, Circle, CookingPot } from 'lucide-react';
 
 // Grouped so the nav communicates that Life OS absorbed several separate
 // apps into one dashboard, rather than reading as one flat list of tabs.
@@ -38,6 +38,7 @@ const RESULT_ICONS = {
   kanban: LayoutGrid,
   goal: Target,
   habit: Flame,
+  recipe: CookingPot,
 };
 
 const RESULT_ROUTES = {
@@ -45,6 +46,7 @@ const RESULT_ROUTES = {
   kanban: '/kanban',
   goal: '/goals',
   habit: '/habits',
+  recipe: '/recipes',
 };
 
 function SearchOverlay({ open, onClose }) {
@@ -131,7 +133,7 @@ function SearchOverlay({ open, onClose }) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search dispatches, kanban cards, goals, habits..."
+            placeholder="Search dispatches, kanban cards, goals, habits, recipes..."
             className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] outline-none"
           />
           <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
